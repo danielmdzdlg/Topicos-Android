@@ -1,7 +1,9 @@
 package com.example.hospitaltopicos;
 
 import android.content.ContentValues;
+import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Color;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -33,31 +35,68 @@ public class ConsultaFragment extends Fragment {
 
         btnGuardar.setOnClickListener(v -> {
             String idPaciente = etIdPaciente.getText().toString().trim();
-            String idMedico = etIdMedico.getText().toString().trim();
+            String idMedicoStr = etIdMedico.getText().toString().trim();
             String diagnostico = etDiagnostico.getText().toString().trim();
             String horaSalida = etHoraSalida.getText().toString().trim();
 
-            if (idPaciente.isEmpty() || idMedico.isEmpty()) {
-                tvResultado.setTextColor(0xFFFF0000);
-                tvResultado.setText("Faltan datos obligatorios");
+            // 1. Excepción / Validación de campos obligatorios vacíos
+            if (idPaciente.isEmpty() || idMedicoStr.isEmpty()) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: Los campos ID Paciente e ID Médico son obligatorios.");
                 return;
             }
 
-            SQLiteDatabase db = dbHelper.getWritableDatabase();
-            ContentValues valores = new ContentValues();
-            valores.put("id_paciente", idPaciente);
-            valores.put("id_medico", Integer.parseInt(idMedico));
-            valores.put("diagnostico", diagnostico);
-            valores.put("hora_salida", horaSalida);
+            int idMedico;
 
-            long resultado = db.insert("consultas", null, valores);
+            // 2. Manejo de Excepción: NumberFormatException (Si el usuario escribe letras en el ID)
+            try {
+                idMedico = Integer.parseInt(idMedicoStr);
+            } catch (NumberFormatException e) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: El ID del médico debe ser un número entero.");
+                return;
+            }
 
-            if (resultado != -1) {
-                tvResultado.setTextColor(0xFF008800);
-                tvResultado.setText("Consulta guardada correctamente");
-            } else {
-                tvResultado.setTextColor(0xFFFF0000);
-                tvResultado.setText("Error al guardar la consulta");
+            // 3. Manejo de Excepción: SQLiteException (Apertura e inserción en Base de Datos)
+            SQLiteDatabase db = null;
+            try {
+                db = dbHelper.getWritableDatabase();
+
+                ContentValues valores = new ContentValues();
+                valores.put("id_paciente", idPaciente);
+                valores.put("id_medico", idMedico);
+                valores.put("diagnostico", diagnostico);
+                valores.put("hora_salida", horaSalida);
+
+                long resultado = db.insert("consultas", null, valores);
+
+                if (resultado != -1) {
+                    tvResultado.setTextColor(Color.parseColor("#008800")); // Verde
+                    tvResultado.setText("Consulta guardada correctamente.");
+
+                    // Limpiar formulario tras guardado exitoso
+                    etIdPaciente.setText("");
+                    etIdMedico.setText("");
+                    etDiagnostico.setText("");
+                    etHoraSalida.setText("");
+                } else {
+                    tvResultado.setTextColor(Color.RED);
+                    tvResultado.setText("Error: No se pudo insertar el registro en la BD.");
+                }
+
+            } catch (SQLiteException e) {
+                // Captura errores específicos de base de datos
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error en la Base de Datos: " + e.getLocalizedMessage());
+            } catch (Exception e) {
+                // Captura cualquier otro error no contemplado
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Ocurrió un error inesperado: " + e.getMessage());
+            } finally {
+                // Cerramos la base de datos siempre al terminar para evitar fugas de memoria
+                if (db != null && db.isOpen()) {
+                    db.close();
+                }
             }
         });
 

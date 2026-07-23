@@ -38,24 +38,40 @@ public class WifiActivity extends AppCompatActivity {
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             mostrarInfoWifi();
         } else {
-            tvWifiInfo.setText("Se necesita permiso de ubicación para ver los datos del WiFi.");
+            tvWifiInfo.setText("Error de permisos: Se necesita permiso de ubicación para ver datos del WiFi.");
         }
     }
 
     private void mostrarInfoWifi() {
-        WifiManager wifiManager = (WifiManager) getApplicationContext()
-                .getSystemService(WIFI_SERVICE);
-        WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+        // Manejo de Excepción: SecurityException y NullPointerException al leer datos de red
+        try {
+            WifiManager wifiManager = (WifiManager) getApplicationContext()
+                    .getSystemService(WIFI_SERVICE);
 
-        if (wifiInfo != null) {
-            String info = "SSID: " + wifiInfo.getSSID() + "\n" +
-                    "BSSID: " + wifiInfo.getBSSID() + "\n" +
-                    "Velocidad de enlace: " + wifiInfo.getLinkSpeed() + " Mbps\n" +
-                    "Fuerza de señal (RSSI): " + wifiInfo.getRssi() + " dBm\n" +
-                    "Dirección IP: " + Integer.toHexString(wifiInfo.getIpAddress());
-            tvWifiInfo.setText(info);
-        } else {
-            tvWifiInfo.setText("No hay conexión WiFi activa.");
+            if (wifiManager == null) {
+                tvWifiInfo.setText("Error: Servicio de WiFi no disponible en este dispositivo.");
+                return;
+            }
+
+            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+
+            if (wifiInfo != null && wifiInfo.getNetworkId() != -1) {
+                String info = "SSID: " + wifiInfo.getSSID() + "\n" +
+                        "BSSID: " + wifiInfo.getBSSID() + "\n" +
+                        "Velocidad de enlace: " + wifiInfo.getLinkSpeed() + " Mbps\n" +
+                        "Fuerza de señal (RSSI): " + wifiInfo.getRssi() + " dBm\n" +
+                        "Dirección IP: " + Integer.toHexString(wifiInfo.getIpAddress());
+                tvWifiInfo.setText(info);
+            } else {
+                tvWifiInfo.setText("No hay conexión WiFi activa.");
+            }
+
+        } catch (SecurityException e) {
+            tvWifiInfo.setText("Excepción de Seguridad: Permisos denegados al acceder a la red WiFi.");
+        } catch (NullPointerException e) {
+            tvWifiInfo.setText("Error de Referencia Nula: No se pudieron leer los datos del adapter WiFi.");
+        } catch (Exception e) {
+            tvWifiInfo.setText("Error inesperado al obtener información de WiFi: " + e.getMessage());
         }
     }
 }

@@ -20,8 +20,8 @@ public class UbicacionActivity extends AppCompatActivity {
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(Location location) {
-            tvUbicacion.setText("Latitud: " + location.getLatitude() +
-                    "\nLongitud: " + location.getLongitude());
+            tvUbicacion.setText("Latitud (x): " + location.getLatitude() +
+                    "\nLongitud (y): " + location.getLongitude());
         }
     };
 
@@ -31,7 +31,14 @@ public class UbicacionActivity extends AppCompatActivity {
         setContentView(R.layout.activity_ubicacion);
 
         tvUbicacion = findViewById(R.id.tvUbicacion);
-        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+        // 1. Manejo de Excepción: Fallo al obtener el servicio del sistema
+        try {
+            locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        } catch (Exception e) {
+            tvUbicacion.setText("Error al inicializar el servicio de ubicación: " + e.getMessage());
+            return;
+        }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -49,29 +56,46 @@ public class UbicacionActivity extends AppCompatActivity {
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             iniciarUbicacion();
         } else {
-            tvUbicacion.setText("Se necesita permiso de ubicación.");
+            tvUbicacion.setText("Error de permisos: Se necesita permiso de ubicación.");
         }
     }
 
     private void iniciarUbicacion() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            locationManager.requestLocationUpdates(
-                    LocationManager.GPS_PROVIDER, 2000, 1, locationListener);
+        // 2. Manejo de Excepción: SecurityException en lecturas de GPS sin permisos
+        try {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED) {
 
-            Location ultima = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            if (ultima != null) {
-                tvUbicacion.setText("Latitud: " + ultima.getLatitude() +
-                        "\nLongitud: " + ultima.getLongitude());
-            } else {
-                tvUbicacion.setText("Obteniendo ubicación...");
+                locationManager.requestLocationUpdates(
+                        LocationManager.GPS_PROVIDER, 2000, 1, locationListener);
+
+                Location ultima = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                if (ultima != null) {
+                    tvUbicacion.setText("Latitud (x): " + ultima.getLatitude() +
+                            "\nLongitud (y): " + ultima.getLongitude());
+                } else {
+                    tvUbicacion.setText("Obteniendo ubicación en tiempo real...");
+                }
             }
+        } catch (SecurityException e) {
+            tvUbicacion.setText("Excepción de Seguridad: Permisos de ubicación denegados.");
+        } catch (Exception e) {
+            tvUbicacion.setText("Error al solicitar actualizaciones de ubicación: " + e.getMessage());
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        locationManager.removeUpdates(locationListener);
+        // 3. Manejo de Excepción al remover listeners
+        try {
+            if (locationManager != null) {
+                locationManager.removeUpdates(locationListener);
+            }
+        } catch (SecurityException e) {
+            // Ignorar o registrar error al cerrar
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
