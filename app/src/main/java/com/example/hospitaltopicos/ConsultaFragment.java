@@ -1,6 +1,7 @@
 package com.example.hospitaltopicos;
 
 import android.content.ContentValues;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
@@ -11,9 +12,13 @@ import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ConsultaFragment extends Fragment {
 
@@ -25,7 +30,7 @@ public class ConsultaFragment extends Fragment {
         View vista = inflater.inflate(R.layout.fragment_consulta, container, false);
 
         EditText etIdPaciente = vista.findViewById(R.id.etIdPacienteConsulta);
-        EditText etIdMedico = vista.findViewById(R.id.etIdMedico);
+        Spinner spinnerMedico = vista.findViewById(R.id.spinnerMedico);
         EditText etDiagnostico = vista.findViewById(R.id.etDiagnostico);
         EditText etHoraSalida = vista.findViewById(R.id.etHoraSalida);
         Button btnGuardar = vista.findViewById(R.id.btnGuardarConsulta);
@@ -33,31 +38,42 @@ public class ConsultaFragment extends Fragment {
 
         DatabaseHelper dbHelper = new DatabaseHelper(requireContext());
 
+        // --- Cargar médicos existentes en el spinner ---
+        List<Integer> idsMedicos = new ArrayList<>();
+        List<String> nombresMedicos = new ArrayList<>();
+
+        SQLiteDatabase dbCarga = dbHelper.getReadableDatabase();
+        Cursor cursorMedicos = dbCarga.rawQuery(
+                "SELECT id_medico, nombre, apellido_paterno FROM medicos", null);
+
+        nombresMedicos.add("Selecciona un médico");
+        idsMedicos.add(-1);
+
+        if (cursorMedicos.moveToFirst()) {
+            do {
+                idsMedicos.add(cursorMedicos.getInt(0));
+                nombresMedicos.add(cursorMedicos.getInt(0) + " - " + cursorMedicos.getString(1) + " " + cursorMedicos.getString(2));
+            } while (cursorMedicos.moveToNext());
+        }
+        cursorMedicos.close();
+
+        ArrayAdapter<String> adapterMedicos = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_dropdown_item, nombresMedicos);
+        spinnerMedico.setAdapter(adapterMedicos);
+
+        // --- Guardar consulta ---
         btnGuardar.setOnClickListener(v -> {
             String idPaciente = etIdPaciente.getText().toString().trim();
-            String idMedicoStr = etIdMedico.getText().toString().trim();
+            int idMedico = idsMedicos.get(spinnerMedico.getSelectedItemPosition());
             String diagnostico = etDiagnostico.getText().toString().trim();
             String horaSalida = etHoraSalida.getText().toString().trim();
 
-            // 1. Excepción / Validación de campos obligatorios vacíos
-            if (idPaciente.isEmpty() || idMedicoStr.isEmpty()) {
+            if (idPaciente.isEmpty() || idMedico == -1) {
                 tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: Los campos ID Paciente e ID Médico son obligatorios.");
+                tvResultado.setText("Error: Selecciona un paciente válido y un médico.");
                 return;
             }
 
-            int idMedico;
-
-            // 2. Manejo de Excepción: NumberFormatException (Si el usuario escribe letras en el ID)
-            try {
-                idMedico = Integer.parseInt(idMedicoStr);
-            } catch (NumberFormatException e) {
-                tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: El ID del médico debe ser un número entero.");
-                return;
-            }
-
-            // 3. Manejo de Excepción: SQLiteException (Apertura e inserción en Base de Datos)
             SQLiteDatabase db = null;
             try {
                 db = dbHelper.getWritableDatabase();
@@ -71,12 +87,12 @@ public class ConsultaFragment extends Fragment {
                 long resultado = db.insert("consultas", null, valores);
 
                 if (resultado != -1) {
-                    tvResultado.setTextColor(Color.parseColor("#008800")); // Verde
+                    tvResultado.setTextColor(Color.parseColor("#008800"));
                     tvResultado.setText("Consulta guardada correctamente.");
 
                     // Limpiar formulario tras guardado exitoso
                     etIdPaciente.setText("");
-                    etIdMedico.setText("");
+                    spinnerMedico.setSelection(0);
                     etDiagnostico.setText("");
                     etHoraSalida.setText("");
                 } else {
@@ -85,15 +101,12 @@ public class ConsultaFragment extends Fragment {
                 }
 
             } catch (SQLiteException e) {
-                // Captura errores específicos de base de datos
                 tvResultado.setTextColor(Color.RED);
                 tvResultado.setText("Error en la Base de Datos: " + e.getLocalizedMessage());
             } catch (Exception e) {
-                // Captura cualquier otro error no contemplado
                 tvResultado.setTextColor(Color.RED);
                 tvResultado.setText("Ocurrió un error inesperado: " + e.getMessage());
             } finally {
-                // Cerramos la base de datos siempre al terminar para evitar fugas de memoria
                 if (db != null && db.isOpen()) {
                     db.close();
                 }

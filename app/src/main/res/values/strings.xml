@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Hospital Topicos</string>
+    <string-array name="generos_array">
+        <item>Selecciona género</item>
+        <item>Masculino</item>
+        <item>Femenino</item>
+        <item>Otro</item>
+    </string-array>
 </resources>

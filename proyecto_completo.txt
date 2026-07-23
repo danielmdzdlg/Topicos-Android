@@ -1,0 +1,1909 @@
+﻿===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\androidTest\java\com\example\hospitaltopicos\ExampleInstrumentedTest.java =====
+
+package com.example.hospitaltopicos;
+
+import android.content.Context;
+
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+import static org.junit.Assert.*;
+
+/**
+ * Instrumented test, which will execute on an Android device.
+ *
+ * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ */
+@RunWith(AndroidJUnit4.class)
+public class ExampleInstrumentedTest {
+    @Test
+    public void useAppContext() {
+        // Context of the app under test.
+        Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        assertEquals("com.example.hospitaltopicos", appContext.getPackageName());
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\java\com\example\hospitaltopicos\ConsultaFragment.java =====
+
+package com.example.hospitaltopicos;
+
+import android.content.ContentValues;
+import android.database.sqlite.SQLiteException;
+import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Color;
+import android.os.Bundle;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+
+public class ConsultaFragment extends Fragment {
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+
+        View vista = inflater.inflate(R.layout.fragment_consulta, container, false);
+
+        EditText etIdPaciente = vista.findViewById(R.id.etIdPacienteConsulta);
+        EditText etIdMedico = vista.findViewById(R.id.etIdMedico);
+        EditText etDiagnostico = vista.findViewById(R.id.etDiagnostico);
+        EditText etHoraSalida = vista.findViewById(R.id.etHoraSalida);
+        Button btnGuardar = vista.findViewById(R.id.btnGuardarConsulta);
+        TextView tvResultado = vista.findViewById(R.id.tvResultadoConsulta);
+
+        DatabaseHelper dbHelper = new DatabaseHelper(requireContext());
+
+        btnGuardar.setOnClickListener(v -> {
+            String idPaciente = etIdPaciente.getText().toString().trim();
+            String idMedicoStr = etIdMedico.getText().toString().trim();
+            String diagnostico = etDiagnostico.getText().toString().trim();
+            String horaSalida = etHoraSalida.getText().toString().trim();
+
+            // 1. ExcepciÃ³n / ValidaciÃ³n de campos obligatorios vacÃ­os
+            if (idPaciente.isEmpty() || idMedicoStr.isEmpty()) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: Los campos ID Paciente e ID MÃ©dico son obligatorios.");
+                return;
+            }
+
+            int idMedico;
+
+            // 2. Manejo de ExcepciÃ³n: NumberFormatException (Si el usuario escribe letras en el ID)
+            try {
+                idMedico = Integer.parseInt(idMedicoStr);
+            } catch (NumberFormatException e) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: El ID del mÃ©dico debe ser un nÃºmero entero.");
+                return;
+            }
+
+            // 3. Manejo de ExcepciÃ³n: SQLiteException (Apertura e inserciÃ³n en Base de Datos)
+            SQLiteDatabase db = null;
+            try {
+                db = dbHelper.getWritableDatabase();
+
+                ContentValues valores = new ContentValues();
+                valores.put("id_paciente", idPaciente);
+                valores.put("id_medico", idMedico);
+                valores.put("diagnostico", diagnostico);
+                valores.put("hora_salida", horaSalida);
+
+                long resultado = db.insert("consultas", null, valores);
+
+                if (resultado != -1) {
+                    tvResultado.setTextColor(Color.parseColor("#008800")); // Verde
+                    tvResultado.setText("Consulta guardada correctamente.");
+
+                    // Limpiar formulario tras guardado exitoso
+                    etIdPaciente.setText("");
+                    etIdMedico.setText("");
+                    etDiagnostico.setText("");
+                    etHoraSalida.setText("");
+                } else {
+                    tvResultado.setTextColor(Color.RED);
+                    tvResultado.setText("Error: No se pudo insertar el registro en la BD.");
+                }
+
+            } catch (SQLiteException e) {
+                // Captura errores especÃ­ficos de base de datos
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error en la Base de Datos: " + e.getLocalizedMessage());
+            } catch (Exception e) {
+                // Captura cualquier otro error no contemplado
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("OcurriÃ³ un error inesperado: " + e.getMessage());
+            } finally {
+                // Cerramos la base de datos siempre al terminar para evitar fugas de memoria
+                if (db != null && db.isOpen()) {
+                    db.close();
+                }
+            }
+        });
+
+        return vista;
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\java\com\example\hospitaltopicos\DatabaseHelper.java =====
+
+package com.example.hospitaltopicos;
+
+import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+public class DatabaseHelper extends SQLiteOpenHelper {
+
+    private static final String DATABASE_NAME = "hospital.db";
+    private static final int DATABASE_VERSION = 1;
+
+    public DatabaseHelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+
+        db.execSQL("CREATE TABLE medicos (" +
+                "id_medico INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "nombre TEXT NOT NULL," +
+                "apellido_paterno TEXT NOT NULL," +
+                "apellido_materno TEXT," +
+                "cedula TEXT NOT NULL UNIQUE," +
+                "telefono TEXT," +
+                "especialidad TEXT)");
+
+        db.execSQL("CREATE TABLE pacientes (" +
+                "id_paciente TEXT PRIMARY KEY," +
+                "nombre TEXT NOT NULL," +
+                "apellido_paterno TEXT NOT NULL," +
+                "apellido_materno TEXT," +
+                "genero TEXT," +
+                "fecha_nacimiento TEXT NOT NULL," +
+                "telefono TEXT)");
+
+        db.execSQL("CREATE TABLE consultas (" +
+                "id_consulta INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "id_paciente TEXT NOT NULL," +
+                "id_medico INTEGER NOT NULL," +
+                "diagnostico TEXT," +
+                "hora_salida TEXT," +
+                "fecha_consulta TEXT DEFAULT (datetime('now'))," +
+                "FOREIGN KEY(id_paciente) REFERENCES pacientes(id_paciente)," +
+                "FOREIGN KEY(id_medico) REFERENCES medicos(id_medico))");
+
+        db.execSQL("CREATE TABLE usuarios (" +
+                "id_usuario INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "usuario TEXT NOT NULL UNIQUE," +
+                "password TEXT NOT NULL)");
+
+        db.execSQL("CREATE TABLE internamientos (" +
+                "id_internamiento INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "id_paciente TEXT NOT NULL," +
+                "fecha_entrada TEXT NOT NULL," +
+                "hora_entrada TEXT NOT NULL," +
+                "fecha_salida TEXT," +
+                "hora_salida TEXT," +
+                "estado TEXT DEFAULT 'internado'," +
+                "FOREIGN KEY(id_paciente) REFERENCES pacientes(id_paciente))");
+
+        // Usuario de prueba para el login
+        db.execSQL("INSERT INTO usuarios (usuario, password) VALUES ('admin', '1234')");
+        db.execSQL("INSERT INTO medicos (nombre, apellido_paterno, cedula, especialidad) VALUES ('Juan', 'PÃ©rez', '12345', 'General')");
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("DROP TABLE IF EXISTS medicos");
+        db.execSQL("DROP TABLE IF EXISTS pacientes");
+        db.execSQL("DROP TABLE IF EXISTS consultas");
+        db.execSQL("DROP TABLE IF EXISTS usuarios");
+        db.execSQL("DROP TABLE IF EXISTS internamientos");
+        onCreate(db);
+    }
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        // Habilita las Ilaves forÃ¡neas (Foreign Keys) para que se respeten las relaciones
+        db.setForeignKeyConstraintsEnabled(true);
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\java\com\example\hospitaltopicos\MainActivity.java =====
+
+package com.example.hospitaltopicos;
+
+import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MainActivity extends AppCompatActivity {
+
+    private DatabaseHelper dbHelper;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        dbHelper = new DatabaseHelper(this);
+
+        EditText etUsuario = findViewById(R.id.etUsuario);
+        EditText etPassword = findViewById(R.id.etPassword);
+        Button btnLogin = findViewById(R.id.btnLogin);
+        TextView tvError = findViewById(R.id.tvError);
+
+        btnLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String usuario = etUsuario.getText().toString().trim();
+                String password = etPassword.getText().toString().trim();
+
+                // 1. ValidaciÃ³n de campos vacÃ­os
+                if (usuario.isEmpty() || password.isEmpty()) {
+                    tvError.setText("Error: Por favor ingresa usuario y contraseÃ±a.");
+                    return;
+                }
+
+                SQLiteDatabase db = null;
+                Cursor cursor = null;
+
+                // 2. Manejo de Excepciones para Base de Datos y Valores Nulos
+                try {
+                    db = dbHelper.getReadableDatabase();
+                    cursor = db.rawQuery(
+                            "SELECT * FROM usuarios WHERE usuario = ? AND password = ?",
+                            new String[]{usuario, password});
+
+                    if (cursor != null && cursor.moveToFirst()) {
+                        startActivity(new Intent(MainActivity.this, MenuActivity.class));
+                        finish();
+                    } else {
+                        tvError.setText("Usuario o contraseÃ±a incorrectos.");
+                    }
+
+                } catch (SQLiteException e) {
+                    // ExcepciÃ³n si la base de datos falla al abrirse o consultarse
+                    tvError.setText("Error en la Base de Datos: " + e.getMessage());
+                } catch (NullPointerException e) {
+                    // ExcepciÃ³n en caso de que alguna referencia a la interfaz o BD sea nula
+                    tvError.setText("Error de referencia nula al iniciar sesiÃ³n.");
+                } catch (Exception e) {
+                    // Captura general para cualquier otro fallo
+                    tvError.setText("Error inesperado: " + e.getMessage());
+                } finally {
+                    // 3. Garantizar el cierre de recursos
+                    if (cursor != null) {
+                        cursor.close();
+                    }
+                    if (db != null && db.isOpen()) {
+                        db.close();
+                    }
+                }
+            }
+        });
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\java\com\example\hospitaltopicos\MenuActivity.java =====
+
+package com.example.hospitaltopicos;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.widget.Button;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class MenuActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_menu);
+
+        Button btnWifi = findViewById(R.id.btnWifi);
+        Button btnUbicacion = findViewById(R.id.btnUbicacion);
+        Button btnPaciente = findViewById(R.id.btnPaciente);
+        Button btnTablas = findViewById(R.id.btnTablas);
+
+        btnWifi.setOnClickListener(v ->
+                startActivity(new Intent(MenuActivity.this, WifiActivity.class)));
+
+        btnUbicacion.setOnClickListener(v ->
+                startActivity(new Intent(MenuActivity.this, UbicacionActivity.class)));
+
+        btnPaciente.setOnClickListener(v ->
+                startActivity(new Intent(MenuActivity.this, PacienteActivity.class)));
+
+        btnTablas.setOnClickListener(v ->
+                startActivity(new Intent(MenuActivity.this, TablasActivity.class)));
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\java\com\example\hospitaltopicos\PacienteActivity.java =====
+
+package com.example.hospitaltopicos;
+
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteConstraintException;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class PacienteActivity extends AppCompatActivity {
+
+    private DatabaseHelper dbHelper;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_paciente);
+
+        dbHelper = new DatabaseHelper(this);
+
+        EditText etIdPaciente = findViewById(R.id.etIdPaciente);
+        EditText etNombre = findViewById(R.id.etNombre);
+        EditText etApellidoPaterno = findViewById(R.id.etApellidoPaterno);
+        EditText etApellidoMaterno = findViewById(R.id.etApellidoMaterno);
+        EditText etGenero = findViewById(R.id.etGenero);
+        EditText etFechaNacimiento = findViewById(R.id.etFechaNacimiento);
+        EditText etTelefono = findViewById(R.id.etTelefono);
+        Button btnGuardarPaciente = findViewById(R.id.btnGuardarPaciente);
+        TextView tvResultado = findViewById(R.id.tvResultado);
+
+        Button btnInternar = findViewById(R.id.btnInternar);
+        Button btnDarDeAlta = findViewById(R.id.btnDarDeAlta);
+        TextView tvResultadoInternamiento = findViewById(R.id.tvResultadoInternamiento);
+
+        // --- BOTÃ“N GUARDAR PACIENTE ---
+        btnGuardarPaciente.setOnClickListener(v -> {
+            String idPaciente = etIdPaciente.getText().toString().trim();
+            String nombre = etNombre.getText().toString().trim();
+            String apellidoPaterno = etApellidoPaterno.getText().toString().trim();
+
+            if (idPaciente.isEmpty() || nombre.isEmpty() || apellidoPaterno.isEmpty()) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: Faltan datos obligatorios (ID, Nombre, Apellido Paterno).");
+                return;
+            }
+
+            SQLiteDatabase db = null;
+            try {
+                db = dbHelper.getWritableDatabase();
+
+                ContentValues valores = new ContentValues();
+                valores.put("id_paciente", idPaciente);
+                valores.put("nombre", nombre);
+                valores.put("apellido_paterno", apellidoPaterno);
+                valores.put("apellido_materno", etApellidoMaterno.getText().toString().trim());
+                valores.put("genero", etGenero.getText().toString().trim());
+                valores.put("fecha_nacimiento", etFechaNacimiento.getText().toString().trim());
+                valores.put("telefono", etTelefono.getText().toString().trim());
+
+                // Usa insertOrThrow para forzar la excepciÃ³n si hay duplicado
+                long resultado = db.insertOrThrow("pacientes", null, valores);
+
+                if (resultado != -1) {
+                    tvResultado.setTextColor(Color.parseColor("#008800"));
+                    tvResultado.setText("Paciente guardado correctamente.");
+
+                    // Limpiar formulario
+                    etNombre.setText("");
+                    etApellidoPaterno.setText("");
+                    etApellidoMaterno.setText("");
+                    etGenero.setText("");
+                    etFechaNacimiento.setText("");
+                    etTelefono.setText("");
+                }
+
+            } catch (SQLiteConstraintException e) {
+                // Captura especÃ­fica cuando el ID del paciente ya existe
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: El expediente o ID del paciente ya estÃ¡ registrado.");
+            } catch (SQLiteException e) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error en la Base de Datos: " + e.getMessage());
+            } catch (Exception e) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error inesperado: " + e.getMessage());
+            } finally {
+                if (db != null && db.isOpen()) {
+                    db.close();
+                }
+            }
+        });
+
+        // --- BOTÃ“N INTERNAR PACIENTE ---
+        btnInternar.setOnClickListener(v -> {
+            String idPaciente = etIdPaciente.getText().toString().trim();
+            if (idPaciente.isEmpty()) {
+                tvResultadoInternamiento.setTextColor(Color.RED);
+                tvResultadoInternamiento.setText("Escribe el expediente del paciente.");
+                return;
+            }
+
+            SQLiteDatabase dbInternar = null;
+            try {
+                dbInternar = dbHelper.getWritableDatabase();
+
+                java.text.SimpleDateFormat sdfFecha = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                java.text.SimpleDateFormat sdfHora = new java.text.SimpleDateFormat("HH:mm:ss");
+                String fechaActual = sdfFecha.format(new java.util.Date());
+                String horaActual = sdfHora.format(new java.util.Date());
+
+                ContentValues valoresInternamiento = new ContentValues();
+                valoresInternamiento.put("id_paciente", idPaciente);
+                valoresInternamiento.put("fecha_entrada", fechaActual);
+                valoresInternamiento.put("hora_entrada", horaActual);
+                valoresInternamiento.put("estado", "internado");
+
+                long resultado = dbInternar.insert("internamientos", null, valoresInternamiento);
+
+                if (resultado != -1) {
+                    tvResultadoInternamiento.setTextColor(Color.parseColor("#008800"));
+                    tvResultadoInternamiento.setText("Paciente internado a las " + horaActual);
+                } else {
+                    tvResultadoInternamiento.setTextColor(Color.RED);
+                    tvResultadoInternamiento.setText("Error al internar paciente.");
+                }
+
+            } catch (SQLiteException e) {
+                tvResultadoInternamiento.setTextColor(Color.RED);
+                tvResultadoInternamiento.setText("Error de BD al internar: " + e.getMessage());
+            } catch (Exception e) {
+                tvResultadoInternamiento.setTextColor(Color.RED);
+                tvResultadoInternamiento.setText("Error inesperado: " + e.getMessage());
+            } finally {
+                if (dbInternar != null && dbInternar.isOpen()) {
+                    dbInternar.close();
+                }
+            }
+        });
+
+        // --- BOTÃ“N DAR DE ALTA ---
+        btnDarDeAlta.setOnClickListener(v -> {
+            String idPaciente = etIdPaciente.getText().toString().trim();
+            if (idPaciente.isEmpty()) {
+                tvResultadoInternamiento.setTextColor(Color.RED);
+                tvResultadoInternamiento.setText("Escribe el expediente del paciente.");
+                return;
+            }
+
+            SQLiteDatabase dbAlta = null;
+            Cursor cursor = null;
+
+            try {
+                dbAlta = dbHelper.getWritableDatabase();
+
+                // Busca el internamiento activo mÃ¡s reciente de ese paciente
+                cursor = dbAlta.rawQuery(
+                        "SELECT id_internamiento FROM internamientos WHERE id_paciente = ? AND estado = 'internado' " +
+                                "ORDER BY id_internamiento DESC LIMIT 1",
+                        new String[]{idPaciente});
+
+                if (cursor != null && cursor.moveToFirst()) {
+                    int idInternamiento = cursor.getInt(0);
+
+                    java.text.SimpleDateFormat sdfFecha = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                    java.text.SimpleDateFormat sdfHora = new java.text.SimpleDateFormat("HH:mm:ss");
+                    String fechaActual = sdfFecha.format(new java.util.Date());
+                    String horaActual = sdfHora.format(new java.util.Date());
+
+                    ContentValues valoresAlta = new ContentValues();
+                    valoresAlta.put("fecha_salida", fechaActual);
+                    valoresAlta.put("hora_salida", horaActual);
+                    valoresAlta.put("estado", "dado_de_alta");
+
+                    int filas = dbAlta.update("internamientos", valoresAlta,
+                            "id_internamiento = ?", new String[]{String.valueOf(idInternamiento)});
+
+                    if (filas > 0) {
+                        tvResultadoInternamiento.setTextColor(Color.parseColor("#008800"));
+                        tvResultadoInternamiento.setText("Paciente dado de alta a las " + horaActual);
+                    } else {
+                        tvResultadoInternamiento.setTextColor(Color.RED);
+                        tvResultadoInternamiento.setText("Error al actualizar la alta.");
+                    }
+                } else {
+                    tvResultadoInternamiento.setTextColor(Color.RED);
+                    tvResultadoInternamiento.setText("Este paciente no tiene internamiento activo.");
+                }
+
+            } catch (SQLiteException e) {
+                tvResultadoInternamiento.setTextColor(Color.RED);
+                tvResultadoInternamiento.setText("Error de BD al dar de alta: " + e.getMessage());
+            } catch (Exception e) {
+                tvResultadoInternamiento.setTextColor(Color.RED);
+                tvResultadoInternamiento.setText("Error inesperado: " + e.getMessage());
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+                if (dbAlta != null && dbAlta.isOpen()) {
+                    dbAlta.close();
+                }
+            }
+        });
+
+        // Inserta el fragment de consulta al abrir la pantalla
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragmentConsultaContainer, new ConsultaFragment())
+                .commit();
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\java\com\example\hospitaltopicos\TablasActivity.java =====
+
+package com.example.hospitaltopicos;
+
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.ScrollView;
+import android.widget.Spinner;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+
+public class TablasActivity extends AppCompatActivity {
+
+    private DatabaseHelper dbHelper;
+    private TextView tvContenidoTabla;
+    private TextView tvPacientesDoctor;
+    private View layoutTablas;
+    private View layoutPacientes;
+
+    private final String[] tablas = {"medicos", "pacientes", "consultas", "usuarios", "internamientos"};
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_tablas);
+
+        dbHelper = new DatabaseHelper(this);
+        tvContenidoTabla = findViewById(R.id.tvContenidoTabla);
+        tvPacientesDoctor = findViewById(R.id.tvPacientesDoctor);
+        layoutTablas = findViewById(R.id.layoutTablas);
+        layoutPacientes = findViewById(R.id.layoutPacientes);
+        Spinner spinnerTablas = findViewById(R.id.spinnerTablas);
+        Button btnTabTablas = findViewById(R.id.btnTabTablas);
+        Button btnTabPacientes = findViewById(R.id.btnTabPacientes);
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, tablas);
+        spinnerTablas.setAdapter(adapter);
+
+        spinnerTablas.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                mostrarContenidoTabla(tablas[position]);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        btnTabTablas.setOnClickListener(v -> {
+            layoutTablas.setVisibility(View.VISIBLE);
+            layoutPacientes.setVisibility(View.GONE);
+        });
+
+        btnTabPacientes.setOnClickListener(v -> {
+            layoutTablas.setVisibility(View.GONE);
+            layoutPacientes.setVisibility(View.VISIBLE);
+            mostrarPacientesConDoctor();
+        });
+    }
+
+    private void mostrarContenidoTabla(String nombreTabla) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT * FROM " + nombreTabla, null);
+
+        StringBuilder sb = new StringBuilder();
+
+        if (cursor.moveToFirst()) {
+            do {
+                for (int i = 0; i < cursor.getColumnCount(); i++) {
+                    sb.append(cursor.getColumnName(i)).append(": ")
+                            .append(cursor.getString(i)).append("\n");
+                }
+                sb.append("--------------------\n");
+            } while (cursor.moveToNext());
+        } else {
+            sb.append("(Sin registros)");
+        }
+
+        cursor.close();
+        tvContenidoTabla.setText(sb.toString());
+    }
+
+    private void mostrarPacientesConDoctor() {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+
+        String query = "SELECT p.nombre AS nombre_paciente, p.apellido_paterno, " +
+                "m.nombre AS nombre_medico, m.apellido_paterno AS apellido_medico, c.diagnostico " +
+                "FROM consultas c " +
+                "JOIN pacientes p ON c.id_paciente = p.id_paciente " +
+                "JOIN medicos m ON c.id_medico = m.id_medico";
+
+        Cursor cursor = db.rawQuery(query, null);
+        StringBuilder sb = new StringBuilder();
+
+        if (cursor.moveToFirst()) {
+            do {
+                sb.append("Paciente: ").append(cursor.getString(0)).append(" ")
+                        .append(cursor.getString(1)).append("\n");
+                sb.append("Atendido por: Dr. ").append(cursor.getString(2)).append(" ")
+                        .append(cursor.getString(3)).append("\n");
+                sb.append("DiagnÃ³stico: ").append(cursor.getString(4)).append("\n");
+                sb.append("--------------------\n");
+            } while (cursor.moveToNext());
+        } else {
+            sb.append("(No hay consultas registradas)");
+        }
+
+        cursor.close();
+        tvPacientesDoctor.setText(sb.toString());
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\java\com\example\hospitaltopicos\UbicacionActivity.java =====
+
+package com.example.hospitaltopicos;
+
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+public class UbicacionActivity extends AppCompatActivity {
+
+    private static final int PERMISO_UBICACION = 200;
+    private TextView tvUbicacion;
+    private LocationManager locationManager;
+
+    private final LocationListener locationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            tvUbicacion.setText("Latitud (x): " + location.getLatitude() +
+                    "\nLongitud (y): " + location.getLongitude());
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_ubicacion);
+
+        tvUbicacion = findViewById(R.id.tvUbicacion);
+
+        // 1. Manejo de ExcepciÃ³n: Fallo al obtener el servicio del sistema
+        try {
+            locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        } catch (Exception e) {
+            tvUbicacion.setText("Error al inicializar el servicio de ubicaciÃ³n: " + e.getMessage());
+            return;
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISO_UBICACION);
+        } else {
+            iniciarUbicacion();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISO_UBICACION && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            iniciarUbicacion();
+        } else {
+            tvUbicacion.setText("Error de permisos: Se necesita permiso de ubicaciÃ³n.");
+        }
+    }
+
+    private void iniciarUbicacion() {
+        // 2. Manejo de ExcepciÃ³n: SecurityException en lecturas de GPS sin permisos
+        try {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED) {
+
+                locationManager.requestLocationUpdates(
+                        LocationManager.GPS_PROVIDER, 2000, 1, locationListener);
+
+                Location ultima = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                if (ultima != null) {
+                    tvUbicacion.setText("Latitud (x): " + ultima.getLatitude() +
+                            "\nLongitud (y): " + ultima.getLongitude());
+                } else {
+                    tvUbicacion.setText("Obteniendo ubicaciÃ³n en tiempo real...");
+                }
+            }
+        } catch (SecurityException e) {
+            tvUbicacion.setText("ExcepciÃ³n de Seguridad: Permisos de ubicaciÃ³n denegados.");
+        } catch (Exception e) {
+            tvUbicacion.setText("Error al solicitar actualizaciones de ubicaciÃ³n: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // 3. Manejo de ExcepciÃ³n al remover listeners
+        try {
+            if (locationManager != null) {
+                locationManager.removeUpdates(locationListener);
+            }
+        } catch (SecurityException e) {
+            // Ignorar o registrar error al cerrar
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\java\com\example\hospitaltopicos\WifiActivity.java =====
+
+package com.example.hospitaltopicos;
+
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.os.Bundle;
+import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+public class WifiActivity extends AppCompatActivity {
+
+    private static final int PERMISO_UBICACION = 100;
+    private TextView tvWifiInfo;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_wifi);
+
+        tvWifiInfo = findViewById(R.id.tvWifiInfo);
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISO_UBICACION);
+        } else {
+            mostrarInfoWifi();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISO_UBICACION && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            mostrarInfoWifi();
+        } else {
+            tvWifiInfo.setText("Error de permisos: Se necesita permiso de ubicaciÃ³n para ver datos del WiFi.");
+        }
+    }
+
+    private void mostrarInfoWifi() {
+        // Manejo de ExcepciÃ³n: SecurityException y NullPointerException al leer datos de red
+        try {
+            WifiManager wifiManager = (WifiManager) getApplicationContext()
+                    .getSystemService(WIFI_SERVICE);
+
+            if (wifiManager == null) {
+                tvWifiInfo.setText("Error: Servicio de WiFi no disponible en este dispositivo.");
+                return;
+            }
+
+            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+
+            if (wifiInfo != null && wifiInfo.getNetworkId() != -1) {
+                String info = "SSID: " + wifiInfo.getSSID() + "\n" +
+                        "BSSID: " + wifiInfo.getBSSID() + "\n" +
+                        "Velocidad de enlace: " + wifiInfo.getLinkSpeed() + " Mbps\n" +
+                        "Fuerza de seÃ±al (RSSI): " + wifiInfo.getRssi() + " dBm\n" +
+                        "DirecciÃ³n IP: " + Integer.toHexString(wifiInfo.getIpAddress());
+                tvWifiInfo.setText(info);
+            } else {
+                tvWifiInfo.setText("No hay conexiÃ³n WiFi activa.");
+            }
+
+        } catch (SecurityException e) {
+            tvWifiInfo.setText("ExcepciÃ³n de Seguridad: Permisos denegados al acceder a la red WiFi.");
+        } catch (NullPointerException e) {
+            tvWifiInfo.setText("Error de Referencia Nula: No se pudieron leer los datos del adapter WiFi.");
+        } catch (Exception e) {
+            tvWifiInfo.setText("Error inesperado al obtener informaciÃ³n de WiFi: " + e.getMessage());
+        }
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\drawable\bg_button.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/primary"/>
+    <corners android:radius="12dp"/>
+</shape>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\drawable\bg_card.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/card_background"/>
+    <corners android:radius="16dp"/>
+</shape>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\drawable\bg_input.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#F0F2F5"/>
+    <corners android:radius="10dp"/>
+    <stroke android:width="1dp" android:color="#E0E4E8"/>
+</shape>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\drawable\ic_launcher_background.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9,0L9,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,0L19,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M29,0L29,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39,0L39,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49,0L49,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M59,0L59,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M69,0L69,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M79,0L79,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M89,0L89,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M99,0L99,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,9L108,9"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,19L108,19"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,29L108,29"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,39L108,39"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,49L108,49"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,59L108,59"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,69L108,69"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,79L108,79"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,89L108,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,99L108,99"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,29L89,29"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,39L89,39"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,49L89,49"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,59L89,59"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,69L89,69"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,79L89,79"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M29,19L29,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39,19L39,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49,19L49,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M59,19L59,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M69,19L69,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M79,19L79,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+</vector>
+
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\drawable\ic_launcher_foreground.xml =====
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="85.84757"
+                android:endY="92.4963"
+                android:startX="42.9492"
+                android:startY="49.59793"
+                android:type="linear">
+                <item
+                    android:color="#44000000"
+                    android:offset="0.0" />
+                <item
+                    android:color="#00000000"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="nonZero"
+        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
+        android:strokeWidth="1"
+        android:strokeColor="#00000000" />
+</vector>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\layout\activity_main.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:fitsSystemWindows="true"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hospital Topicos"
+        android:textSize="24sp"
+        android:layout_marginBottom="32dp"/>
+
+    <EditText
+        android:id="@+id/etUsuario"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Usuario"/>
+
+    <EditText
+        android:id="@+id/etPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="ContraseÃ±a"
+        android:inputType="textPassword"
+        android:layout_marginTop="8dp"/>
+
+    <Button
+        android:id="@+id/btnLogin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ingresar"
+        android:layout_marginTop="16dp"/>
+
+    <TextView
+        android:id="@+id/tvError"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FF0000"
+        android:layout_marginTop="8dp"/>
+
+</LinearLayout>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\layout\activity_menu.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background"
+    android:fitsSystemWindows="true"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="MenÃº Principal"
+        style="@style/TituloPantalla"
+        android:layout_marginTop="16dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Selecciona una opciÃ³n"
+        android:textColor="@color/text_secondary"
+        android:layout_marginBottom="24dp"/>
+
+    <Button
+        android:id="@+id/btnWifi"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Detalles del WiFi"
+        style="@style/BotonPrimario"
+        android:layout_marginBottom="14dp"/>
+
+    <Button
+        android:id="@+id/btnUbicacion"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="UbicaciÃ³n en tiempo real"
+        style="@style/BotonPrimario"
+        android:layout_marginBottom="14dp"/>
+
+    <Button
+        android:id="@+id/btnPaciente"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Guardar paciente / Consulta"
+        style="@style/BotonPrimario"
+        android:layout_marginBottom="14dp"/>
+
+    <Button
+        android:id="@+id/btnTablas"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ver tablas"
+        style="@style/BotonPrimario"
+        android:layout_marginBottom="14dp"/>
+
+</LinearLayout>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\layout\activity_paciente.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Guardar Paciente"
+            style="@style/TituloPantalla"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="20dp"
+            android:elevation="2dp">
+
+            <EditText android:id="@+id/etIdPaciente"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Expediente (ID)"/>
+
+            <EditText android:id="@+id/etNombre"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Nombre"/>
+
+            <EditText android:id="@+id/etApellidoPaterno"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Apellido paterno"/>
+
+            <EditText android:id="@+id/etApellidoMaterno"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Apellido materno"/>
+
+            <EditText android:id="@+id/etGenero"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="GÃ©nero"/>
+
+            <EditText android:id="@+id/etFechaNacimiento"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Fecha nacimiento (AAAA-MM-DD)"/>
+
+            <EditText android:id="@+id/etTelefono"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="TelÃ©fono"
+                android:inputType="phone"/>
+
+            <Button android:id="@+id/btnGuardarPaciente"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Guardar paciente"
+                android:layout_marginTop="6dp"/>
+
+            <TextView android:id="@+id/tvResultado"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/success"
+                android:layout_marginTop="10dp"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#E0E4E8"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"/>
+
+            <Button android:id="@+id/btnInternar"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Internar paciente"/>
+
+            <Button android:id="@+id/btnDarDeAlta"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Dar de alta"
+                android:layout_marginTop="10dp"/>
+
+            <TextView android:id="@+id/tvResultadoInternamiento"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/success"
+                android:layout_marginTop="10dp"/>
+
+        </LinearLayout>
+
+        <!-- Tarjeta del fragment de consulta -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="20dp"
+            android:elevation="2dp"
+            android:layout_marginTop="20dp">
+
+            <FrameLayout
+                android:id="@+id/fragmentConsultaContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\layout\activity_tablas.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background"
+    android:fitsSystemWindows="true"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ver Tablas"
+        style="@style/TituloPantalla"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
+
+        <Button
+            android:id="@+id/btnTabTablas"
+            style="@style/BotonPrimario"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="Tablas"/>
+
+        <Button
+            android:id="@+id/btnTabPacientes"
+            style="@style/BotonPrimario"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:backgroundTint="@color/accent"
+            android:text="Pacientes/Doctor"/>
+
+    </LinearLayout>
+
+    <!-- Vista 1: Tablas -->
+    <LinearLayout
+        android:id="@+id/layoutTablas"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <Spinner
+            android:id="@+id/spinnerTablas"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_input"
+            android:padding="12dp"/>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_card"
+                android:padding="16dp"
+                android:elevation="2dp">
+
+                <TextView
+                    android:id="@+id/tvContenidoTabla"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="monospace"/>
+
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- Vista 2: Pacientes con su doctor -->
+    <ScrollView
+        android:id="@+id/layoutPacientes"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="16dp"
+            android:elevation="2dp">
+
+            <TextView
+                android:id="@+id/tvPacientesDoctor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                android:fontFamily="monospace"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\layout\activity_ubicacion.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background"
+    android:fitsSystemWindows="true"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="UbicaciÃ³n en tiempo real"
+        style="@style/TituloPantalla"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card"
+        android:padding="20dp"
+        android:elevation="2dp">
+
+        <TextView
+            android:id="@+id/tvUbicacion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/text_primary"
+            android:lineSpacingExtra="6dp"/>
+
+    </LinearLayout>
+
+</LinearLayout>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\layout\activity_wifi.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background"
+    android:fitsSystemWindows="true"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Detalles del WiFi"
+        style="@style/TituloPantalla"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card"
+        android:padding="20dp"
+        android:elevation="2dp">
+
+        <TextView
+            android:id="@+id/tvWifiInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/text_primary"
+            android:lineSpacingExtra="6dp"/>
+
+    </LinearLayout>
+
+</LinearLayout>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\layout\fragment_consulta.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Crear Consulta"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary_dark"
+        android:layout_marginBottom="14dp"/>
+
+    <EditText android:id="@+id/etIdPacienteConsulta"
+        style="@style/InputTexto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Expediente del paciente (ID)"/>
+
+    <EditText android:id="@+id/etIdMedico"
+        style="@style/InputTexto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="ID del mÃ©dico"/>
+
+    <EditText android:id="@+id/etDiagnostico"
+        style="@style/InputTexto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="DiagnÃ³stico"/>
+
+    <EditText android:id="@+id/etHoraSalida"
+        style="@style/InputTexto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Hora de salida (HH:MM)"/>
+
+    <Button android:id="@+id/btnGuardarConsulta"
+        style="@style/BotonPrimario"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Guardar consulta"
+        android:layout_marginTop="6dp"/>
+
+    <TextView android:id="@+id/tvResultadoConsulta"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/success"
+        android:layout_marginTop="10dp"/>
+
+</LinearLayout>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\mipmap-anydpi-v26\ic_launcher_round.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\values\colors.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#2C3E50</color>
+    <color name="primary_dark">#1A252F</color>
+    <color name="accent">#5B7A99</color>
+    <color name="background">#EEF1F4</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="text_primary">#2C3338</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="danger">#A94442</color>
+    <color name="success">#3C7A5A</color>
+</resources>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\values\strings.xml =====
+
+<resources>
+    <string name="app_name">Hospital Topicos</string>
+</resources>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\values\styles.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="BotonPrimario">
+        <item name="android:background">@drawable/bg_button</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:padding">14dp</item>
+        <item name="android:elevation">2dp</item>
+    </style>
+
+    <style name="InputTexto">
+        <item name="android:background">@drawable/bg_input</item>
+        <item name="android:padding">14dp</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:layout_marginBottom">10dp</item>
+    </style>
+
+    <style name="TituloPantalla">
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/primary_dark</item>
+        <item name="android:layout_marginBottom">20dp</item>
+    </style>
+
+</resources>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\values\themes.xml =====
+
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.HospitalTopicos" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your light theme here. -->
+        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="android:statusBarColor">@color/primary_dark</item>
+        <item name="android:windowBackground">@color/background</item>
+    </style>
+
+
+    <style name="Theme.HospitalTopicos" parent="Base.Theme.HospitalTopicos" />
+
+</resources>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\values-night\themes.xml =====
+
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.HospitalTopicos" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your light theme here. -->
+        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="android:statusBarColor">@color/primary_dark</item>
+        <item name="android:windowBackground">@color/background</item>
+    </style>
+
+
+    <style name="Theme.HospitalTopicos" parent="Base.Theme.HospitalTopicos" />
+
+</resources>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\xml\backup_rules.xml =====
+
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample backup rules file; uncomment and customize as necessary.
+   See https://developer.android.com/guide/topics/data/autobackup
+   for details.
+   Note: This file is ignored for devices older than API 31
+   See https://developer.android.com/about/versions/12/backup-restore
+-->
+<full-backup-content>
+    <!--
+   <include domain="sharedpref" path="."/>
+   <exclude domain="sharedpref" path="device.xml"/>
+-->
+</full-backup-content>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\xml\data_extraction_rules.xml =====
+
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample data extraction rules file; uncomment and customize as necessary.
+   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   for details.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- TODO: Use <include> and <exclude> to control what is backed up.
+        <include .../>
+        <exclude .../>
+        -->
+    </cloud-backup>
+    <!--
+    <device-transfer>
+        <include .../>
+        <exclude .../>
+    </device-transfer>
+    -->
+</data-extraction-rules>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\AndroidManifest.xml =====
+
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.HospitalTopicos">
+        <activity
+            android:name=".ConsultaFragment"
+            android:exported="false" />
+        <activity
+            android:name=".MenuActivity"
+            android:exported="false" />
+        <activity
+            android:name=".TablasActivity"
+            android:exported="false" />
+        <activity
+            android:name=".PacienteActivity"
+            android:exported="false" />
+        <activity
+            android:name=".UbicacionActivity"
+            android:exported="false" />
+        <activity
+            android:name=".WifiActivity"
+            android:exported="false" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\test\java\com\example\hospitaltopicos\ExampleUnitTest.java =====
+
+package com.example.hospitaltopicos;
+
+import org.junit.Test;
+
+import static org.junit.Assert.*;
+
+/**
+ * Example local unit test, which will execute on the development machine (host).
+ *
+ * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
+ */
+public class ExampleUnitTest {
+    @Test
+    public void addition_isCorrect() {
+        assertEquals(4, 2 + 2);
+    }
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\build.gradle.kts =====
+
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+    namespace = "com.example.hospitaltopicos"
+    compileSdk {
+        version = release(36) {
+            minorApiLevel = 1
+        }
+    }
+
+    defaultConfig {
+        applicationId = "com.example.hospitaltopicos"
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    implementation(libs.activity.ktx)
+    implementation(libs.appcompat)
+    implementation(libs.constraintlayout)
+    implementation(libs.material)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.ext.junit)
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\build.gradle.kts =====
+
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    alias(libs.plugins.android.application) apply false
+}
+
+
+===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\settings.gradle.kts =====
+
+pluginManagement {
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "Hospital Topicos"
+include(":app")
+
+
+

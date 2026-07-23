@@ -25,7 +25,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="4dp"
             android:text="Tablas"/>
 
         <Button
@@ -34,9 +34,19 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="6dp"
+            android:layout_marginHorizontal="4dp"
             android:backgroundTint="@color/accent"
-            android:text="Pacientes/Doctor"/>
+            android:text="Pac/Doc"/>
+
+        <Button
+            android:id="@+id/btnTabGestor"
+            style="@style/BotonPrimario"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:backgroundTint="@color/danger"
+            android:text="Gestor"/>
 
     </LinearLayout>
 
@@ -101,6 +111,79 @@
                 android:textSize="13sp"
                 android:textColor="@color/text_primary"
                 android:fontFamily="monospace"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Vista 3: Gestor (actualizar / eliminar) -->
+    <ScrollView
+        android:id="@+id/layoutGestor"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="20dp"
+            android:elevation="2dp">
+
+            <Spinner
+                android:id="@+id/spinnerGestorTabla"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_input"
+                android:padding="12dp"
+                android:layout_marginBottom="10dp"/>
+
+            <EditText
+                android:id="@+id/etGestorId"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="ID del registro"/>
+
+            <Button
+                android:id="@+id/btnGestorBuscar"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Buscar"/>
+
+            <LinearLayout
+                android:id="@+id/contenedorCamposGestor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"/>
+
+            <Button
+                android:id="@+id/btnGestorActualizar"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Actualizar"
+                android:layout_marginTop="10dp"
+                android:visibility="gone"/>
+
+            <Button
+                android:id="@+id/btnGestorEliminar"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="@color/danger"
+                android:text="Eliminar registro"
+                android:layout_marginTop="10dp"
+                android:visibility="gone"/>
+
+            <TextView
+                android:id="@+id/tvResultadoGestor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/success"
+                android:layout_marginTop="10dp"/>
 
         </LinearLayout>
     </ScrollView>

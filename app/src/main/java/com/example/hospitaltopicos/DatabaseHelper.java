@@ -73,10 +73,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("DROP TABLE IF EXISTS internamientos");
         onCreate(db);
     }
+
     @Override
     public void onConfigure(SQLiteDatabase db) {
         super.onConfigure(db);
-        // Habilita las Ilaves foráneas (Foreign Keys) para que se respeten las relaciones
+        // Habilita las llaves foráneas (Foreign Keys) para que se respeten las relaciones
         db.setForeignKeyConstraintsEnabled(true);
     }
 }

@@ -11,6 +11,9 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import android.widget.Spinner;
+import android.app.DatePickerDialog;
+import java.util.Calendar;
 
 public class PacienteActivity extends AppCompatActivity {
 
@@ -27,8 +30,26 @@ public class PacienteActivity extends AppCompatActivity {
         EditText etNombre = findViewById(R.id.etNombre);
         EditText etApellidoPaterno = findViewById(R.id.etApellidoPaterno);
         EditText etApellidoMaterno = findViewById(R.id.etApellidoMaterno);
-        EditText etGenero = findViewById(R.id.etGenero);
+        Spinner spinnerGenero = findViewById(R.id.spinnerGenero);
         EditText etFechaNacimiento = findViewById(R.id.etFechaNacimiento);
+        etFechaNacimiento.setOnClickListener(v -> {
+            Calendar calendarioActual = Calendar.getInstance();
+
+            DatePickerDialog dialog = new DatePickerDialog(
+                    this,
+                    (view, year, month, dayOfMonth) -> {
+                        String fechaFormateada = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth);
+                        etFechaNacimiento.setText(fechaFormateada);
+                    },
+                    calendarioActual.get(Calendar.YEAR),
+                    calendarioActual.get(Calendar.MONTH),
+                    calendarioActual.get(Calendar.DAY_OF_MONTH)
+            );
+
+            // ExcepciÃ³n: no permite seleccionar fechas futuras
+            dialog.getDatePicker().setMaxDate(System.currentTimeMillis());
+            dialog.show();
+        });
         EditText etTelefono = findViewById(R.id.etTelefono);
         Button btnGuardarPaciente = findViewById(R.id.btnGuardarPaciente);
         TextView tvResultado = findViewById(R.id.tvResultado);
@@ -58,7 +79,8 @@ public class PacienteActivity extends AppCompatActivity {
                 valores.put("nombre", nombre);
                 valores.put("apellido_paterno", apellidoPaterno);
                 valores.put("apellido_materno", etApellidoMaterno.getText().toString().trim());
-                valores.put("genero", etGenero.getText().toString().trim());
+                String genero = spinnerGenero.getSelectedItemPosition() == 0 ? "" : spinnerGenero.getSelectedItem().toString();
+                valores.put("genero", genero);
                 valores.put("fecha_nacimiento", etFechaNacimiento.getText().toString().trim());
                 valores.put("telefono", etTelefono.getText().toString().trim());
 
@@ -73,7 +95,7 @@ public class PacienteActivity extends AppCompatActivity {
                     etNombre.setText("");
                     etApellidoPaterno.setText("");
                     etApellidoMaterno.setText("");
-                    etGenero.setText("");
+                    spinnerGenero.setSelection(0);
                     etFechaNacimiento.setText("");
                     etTelefono.setText("");
                 }
