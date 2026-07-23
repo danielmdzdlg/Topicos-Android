@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Crear Consulta"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary_dark"
+        android:layout_marginBottom="14dp"/>
+
+    <EditText android:id="@+id/etIdPacienteConsulta"
+        style="@style/InputTexto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Expediente del paciente (ID)"/>
+
+    <EditText android:id="@+id/etIdMedico"
+        style="@style/InputTexto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="ID del médico"/>
+
+    <EditText android:id="@+id/etDiagnostico"
+        style="@style/InputTexto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Diagnóstico"/>
+
+    <EditText android:id="@+id/etHoraSalida"
+        style="@style/InputTexto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Hora de salida (HH:MM)"/>
+
+    <Button android:id="@+id/btnGuardarConsulta"
+        style="@style/BotonPrimario"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Guardar consulta"
+        android:layout_marginTop="6dp"/>
+
+    <TextView android:id="@+id/tvResultadoConsulta"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/success"
+        android:layout_marginTop="10dp"/>
+
+</LinearLayout>

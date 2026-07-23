@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Guardar Paciente"
+            style="@style/TituloPantalla"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="20dp"
+            android:elevation="2dp">
+
+            <EditText android:id="@+id/etIdPaciente"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Expediente (ID)"/>
+
+            <EditText android:id="@+id/etNombre"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Nombre"/>
+
+            <EditText android:id="@+id/etApellidoPaterno"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Apellido paterno"/>
+
+            <EditText android:id="@+id/etApellidoMaterno"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Apellido materno"/>
+
+            <EditText android:id="@+id/etGenero"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Género"/>
+
+            <EditText android:id="@+id/etFechaNacimiento"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Fecha nacimiento (AAAA-MM-DD)"/>
+
+            <EditText android:id="@+id/etTelefono"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Teléfono"
+                android:inputType="phone"/>
+
+            <Button android:id="@+id/btnGuardarPaciente"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Guardar paciente"
+                android:layout_marginTop="6dp"/>
+
+            <TextView android:id="@+id/tvResultado"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/success"
+                android:layout_marginTop="10dp"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#E0E4E8"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"/>
+
+            <Button android:id="@+id/btnInternar"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Internar paciente"/>
+
+            <Button android:id="@+id/btnDarDeAlta"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Dar de alta"
+                android:layout_marginTop="10dp"/>
+
+            <TextView android:id="@+id/tvResultadoInternamiento"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/success"
+                android:layout_marginTop="10dp"/>
+
+        </LinearLayout>
+
+        <!-- Tarjeta del fragment de consulta -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="20dp"
+            android:elevation="2dp"
+            android:layout_marginTop="20dp">
+
+            <FrameLayout
+                android:id="@+id/fragmentConsultaContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
