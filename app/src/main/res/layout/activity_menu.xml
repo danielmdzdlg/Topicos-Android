@@ -53,4 +53,12 @@
         style="@style/BotonPrimario"
         android:layout_marginBottom="14dp"/>
 
+    <Button
+        android:id="@+id/btnRegistro"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Registrar médico / usuario"
+        style="@style/BotonPrimario"
+        android:layout_marginBottom="14dp"/>
+
 </LinearLayout>

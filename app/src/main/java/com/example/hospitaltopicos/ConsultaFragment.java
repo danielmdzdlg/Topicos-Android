@@ -114,9 +114,9 @@ public class ConsultaFragment extends Fragment {
             String diagnostico = etDiagnostico.getText().toString().trim();
             String horaSalida = etHoraSalida.getText().toString().trim();
 
-            if (idPaciente.isEmpty() || idMedico == -1) {
+            if (idPaciente.isEmpty() || idMedico == -1 || diagnostico.isEmpty() || horaSalida.isEmpty()) {
                 tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: Selecciona un paciente válido y un médico.");
+                tvResultado.setText("Error: Todos los campos son obligatorios.");
                 return;
             }
 

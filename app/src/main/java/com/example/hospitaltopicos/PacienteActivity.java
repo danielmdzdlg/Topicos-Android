@@ -77,6 +77,8 @@ public class PacienteActivity extends AppCompatActivity {
                         String fechaSeleccionada = String.format(Locale.getDefault(), "%04d-%02d-%02d", year, monthOfYear + 1, dayOfMonth);
                         etFechaNacimiento.setText(fechaSeleccionada);
                     }, anio, mes, dia);
+
+            datePickerDialog.getDatePicker().setMaxDate(System.currentTimeMillis());
             datePickerDialog.show();
         });
 
@@ -88,9 +90,14 @@ public class PacienteActivity extends AppCompatActivity {
             String fechaNacimiento = etFechaNacimiento.getText().toString().trim();
             String telefono = etTelefono.getText().toString().trim();
 
-            if (idPaciente.isEmpty() || nombre.isEmpty() || apellidoPaterno.isEmpty()) {
+            String apellidoMaterno = etApellidoMaterno.getText().toString().trim();
+            String genero = (spinnerGenero.getSelectedItemPosition() > 0 && spinnerGenero.getSelectedItem() != null)
+                    ? spinnerGenero.getSelectedItem().toString() : "";
+
+            if (idPaciente.isEmpty() || nombre.isEmpty() || apellidoPaterno.isEmpty() ||
+                    apellidoMaterno.isEmpty() || genero.isEmpty() || fechaNacimiento.isEmpty() || telefono.isEmpty()) {
                 tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: Faltan datos obligatorios (ID, Nombre, Apellido).");
+                tvResultado.setText("Error: Todos los campos son obligatorios.");
                 return;
             }
 
@@ -118,7 +125,6 @@ public class PacienteActivity extends AppCompatActivity {
             try {
                 db = dbHelper.getWritableDatabase();
 
-                String genero = (spinnerGenero.getSelectedItem() != null) ? spinnerGenero.getSelectedItem().toString() : "";
 
                 ContentValues valores = new ContentValues();
                 valores.put("id_paciente", idPaciente);

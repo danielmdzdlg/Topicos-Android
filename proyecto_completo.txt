@@ -32,7 +32,9 @@ public class ExampleInstrumentedTest {
 
 package com.example.hospitaltopicos;
 
+import android.app.TimePickerDialog;
 import android.content.ContentValues;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
@@ -43,9 +45,15 @@ import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Locale;
 
 public class ConsultaFragment extends Fragment {
 
@@ -57,7 +65,7 @@ public class ConsultaFragment extends Fragment {
         View vista = inflater.inflate(R.layout.fragment_consulta, container, false);
 
         EditText etIdPaciente = vista.findViewById(R.id.etIdPacienteConsulta);
-        EditText etIdMedico = vista.findViewById(R.id.etIdMedico);
+        Spinner spinnerMedico = vista.findViewById(R.id.spinnerMedico);
         EditText etDiagnostico = vista.findViewById(R.id.etDiagnostico);
         EditText etHoraSalida = vista.findViewById(R.id.etHoraSalida);
         Button btnGuardar = vista.findViewById(R.id.btnGuardarConsulta);
@@ -65,31 +73,85 @@ public class ConsultaFragment extends Fragment {
 
         DatabaseHelper dbHelper = new DatabaseHelper(requireContext());
 
+        // --- RELOJ (TIMEPICKER) PARA HORA DE SALIDA ---
+        etHoraSalida.setFocusable(false);
+        etHoraSalida.setClickable(true);
+        etHoraSalida.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            int horaActual = calendar.get(Calendar.HOUR_OF_DAY);
+            int minutoActual = calendar.get(Calendar.MINUTE);
+
+            TimePickerDialog timePickerDialog = new TimePickerDialog(
+                    requireContext(),
+                    (view, hourOfDay, minute) -> {
+                        String horaFormateada = String.format(Locale.getDefault(), "%02d:%02d", hourOfDay, minute);
+                        etHoraSalida.setText(horaFormateada);
+                    },
+                    horaActual,
+                    minutoActual,
+                    true // true para formato de 24 horas (00:00 - 23:59)
+            );
+            timePickerDialog.show();
+        });
+
+        // --- Cargar mÃ©dicos existentes en el spinner ---
+        List<Integer> idsMedicos = new ArrayList<>();
+        List<String> nombresMedicos = new ArrayList<>();
+
+        nombresMedicos.add("Selecciona un mÃ©dico");
+        idsMedicos.add(-1);
+
+        SQLiteDatabase dbCarga = null;
+        Cursor cursorMedicos = null;
+
+        try {
+            dbCarga = dbHelper.getReadableDatabase();
+            cursorMedicos = dbCarga.rawQuery(
+                    "SELECT id_medico, nombre, apellido_paterno FROM medicos", null);
+
+            if (cursorMedicos.moveToFirst()) {
+                do {
+                    idsMedicos.add(cursorMedicos.getInt(0));
+                    nombresMedicos.add(cursorMedicos.getInt(0) + " - " + cursorMedicos.getString(1) + " " + cursorMedicos.getString(2));
+                } while (cursorMedicos.moveToNext());
+            }
+        } catch (SQLiteException e) {
+            tvResultado.setTextColor(Color.RED);
+            tvResultado.setText("Error al cargar lista de mÃ©dicos: " + e.getMessage());
+        } catch (Exception e) {
+            tvResultado.setTextColor(Color.RED);
+            tvResultado.setText("Error inesperado al leer mÃ©dicos: " + e.getMessage());
+        } finally {
+            if (cursorMedicos != null) cursorMedicos.close();
+            if (dbCarga != null && dbCarga.isOpen()) dbCarga.close();
+        }
+
+        ArrayAdapter<String> adapterMedicos = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_dropdown_item, nombresMedicos);
+        spinnerMedico.setAdapter(adapterMedicos);
+
+        // --- Guardar consulta ---
         btnGuardar.setOnClickListener(v -> {
             String idPaciente = etIdPaciente.getText().toString().trim();
-            String idMedicoStr = etIdMedico.getText().toString().trim();
+
+            // ValidaciÃ³n previa de selecciÃ³n en el Spinner
+            int pos = spinnerMedico.getSelectedItemPosition();
+            if (pos < 0 || pos >= idsMedicos.size()) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: SelecciÃ³n de mÃ©dico no vÃ¡lida.");
+                return;
+            }
+
+            int idMedico = idsMedicos.get(pos);
             String diagnostico = etDiagnostico.getText().toString().trim();
             String horaSalida = etHoraSalida.getText().toString().trim();
 
-            // 1. ExcepciÃ³n / ValidaciÃ³n de campos obligatorios vacÃ­os
-            if (idPaciente.isEmpty() || idMedicoStr.isEmpty()) {
+            if (idPaciente.isEmpty() || idMedico == -1) {
                 tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: Los campos ID Paciente e ID MÃ©dico son obligatorios.");
+                tvResultado.setText("Error: Selecciona un paciente vÃ¡lido y un mÃ©dico.");
                 return;
             }
 
-            int idMedico;
-
-            // 2. Manejo de ExcepciÃ³n: NumberFormatException (Si el usuario escribe letras en el ID)
-            try {
-                idMedico = Integer.parseInt(idMedicoStr);
-            } catch (NumberFormatException e) {
-                tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: El ID del mÃ©dico debe ser un nÃºmero entero.");
-                return;
-            }
-
-            // 3. Manejo de ExcepciÃ³n: SQLiteException (Apertura e inserciÃ³n en Base de Datos)
             SQLiteDatabase db = null;
             try {
                 db = dbHelper.getWritableDatabase();
@@ -103,12 +165,12 @@ public class ConsultaFragment extends Fragment {
                 long resultado = db.insert("consultas", null, valores);
 
                 if (resultado != -1) {
-                    tvResultado.setTextColor(Color.parseColor("#008800")); // Verde
+                    tvResultado.setTextColor(Color.parseColor("#008800"));
                     tvResultado.setText("Consulta guardada correctamente.");
 
                     // Limpiar formulario tras guardado exitoso
                     etIdPaciente.setText("");
-                    etIdMedico.setText("");
+                    spinnerMedico.setSelection(0);
                     etDiagnostico.setText("");
                     etHoraSalida.setText("");
                 } else {
@@ -117,15 +179,12 @@ public class ConsultaFragment extends Fragment {
                 }
 
             } catch (SQLiteException e) {
-                // Captura errores especÃ­ficos de base de datos
                 tvResultado.setTextColor(Color.RED);
                 tvResultado.setText("Error en la Base de Datos: " + e.getLocalizedMessage());
             } catch (Exception e) {
-                // Captura cualquier otro error no contemplado
                 tvResultado.setTextColor(Color.RED);
                 tvResultado.setText("OcurriÃ³ un error inesperado: " + e.getMessage());
             } finally {
-                // Cerramos la base de datos siempre al terminar para evitar fugas de memoria
                 if (db != null && db.isOpen()) {
                     db.close();
                 }
@@ -214,10 +273,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("DROP TABLE IF EXISTS internamientos");
         onCreate(db);
     }
+
     @Override
     public void onConfigure(SQLiteDatabase db) {
         super.onConfigure(db);
-        // Habilita las Ilaves forÃ¡neas (Foreign Keys) para que se respeten las relaciones
+        // Habilita las llaves forÃ¡neas (Foreign Keys) para que se respeten las relaciones
         db.setForeignKeyConstraintsEnabled(true);
     }
 }
@@ -347,6 +407,7 @@ public class MenuActivity extends AppCompatActivity {
 
 package com.example.hospitaltopicos;
 
+import android.app.DatePickerDialog;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteConstraintException;
@@ -354,10 +415,18 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Locale;
 
 public class PacienteActivity extends AppCompatActivity {
 
@@ -374,7 +443,7 @@ public class PacienteActivity extends AppCompatActivity {
         EditText etNombre = findViewById(R.id.etNombre);
         EditText etApellidoPaterno = findViewById(R.id.etApellidoPaterno);
         EditText etApellidoMaterno = findViewById(R.id.etApellidoMaterno);
-        EditText etGenero = findViewById(R.id.etGenero);
+        Spinner spinnerGenero = findViewById(R.id.spinnerGenero);
         EditText etFechaNacimiento = findViewById(R.id.etFechaNacimiento);
         EditText etTelefono = findViewById(R.id.etTelefono);
         Button btnGuardarPaciente = findViewById(R.id.btnGuardarPaciente);
@@ -384,51 +453,110 @@ public class PacienteActivity extends AppCompatActivity {
         Button btnDarDeAlta = findViewById(R.id.btnDarDeAlta);
         TextView tvResultadoInternamiento = findViewById(R.id.tvResultadoInternamiento);
 
+        // --- RESTRICCIÃ“N DE TELÃ‰FONO: SOLO NÃšMEROS Y MÃXIMO 10 DÃGITOS ---
+        etTelefono.setInputType(InputType.TYPE_CLASS_NUMBER);
+        etTelefono.setFilters(new InputFilter[]{ new InputFilter.LengthFilter(10) });
+
+        // --- FILTRO: BLOQUEAR NÃšMEROS Y SÃMBOLOS EN NOMBRES ---
+        InputFilter filtroSoloLetras = (source, start, end, dest, dstart, dend) -> {
+            for (int i = start; i < end; i++) {
+                if (!Character.isLetter(source.charAt(i)) && !Character.isWhitespace(source.charAt(i))) {
+                    return ""; // Bloquea si no es letra o espacio
+                }
+            }
+            return null;
+        };
+
+        etNombre.setFilters(new InputFilter[]{filtroSoloLetras});
+        etApellidoPaterno.setFilters(new InputFilter[]{filtroSoloLetras});
+        etApellidoMaterno.setFilters(new InputFilter[]{filtroSoloLetras});
+
+        // --- CALENDARIO (DATEPICKER) PARA FECHA DE NACIMIENTO ---
+        etFechaNacimiento.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            int anio = calendar.get(Calendar.YEAR);
+            int mes = calendar.get(Calendar.MONTH);
+            int dia = calendar.get(Calendar.DAY_OF_MONTH);
+
+            DatePickerDialog datePickerDialog = new DatePickerDialog(
+                    PacienteActivity.this,
+                    (view, year, monthOfYear, dayOfMonth) -> {
+                        String fechaSeleccionada = String.format(Locale.getDefault(), "%04d-%02d-%02d", year, monthOfYear + 1, dayOfMonth);
+                        etFechaNacimiento.setText(fechaSeleccionada);
+                    }, anio, mes, dia);
+            datePickerDialog.show();
+        });
+
         // --- BOTÃ“N GUARDAR PACIENTE ---
         btnGuardarPaciente.setOnClickListener(v -> {
             String idPaciente = etIdPaciente.getText().toString().trim();
             String nombre = etNombre.getText().toString().trim();
             String apellidoPaterno = etApellidoPaterno.getText().toString().trim();
+            String fechaNacimiento = etFechaNacimiento.getText().toString().trim();
+            String telefono = etTelefono.getText().toString().trim();
 
             if (idPaciente.isEmpty() || nombre.isEmpty() || apellidoPaterno.isEmpty()) {
                 tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: Faltan datos obligatorios (ID, Nombre, Apellido Paterno).");
+                tvResultado.setText("Error: Faltan datos obligatorios (ID, Nombre, Apellido).");
                 return;
+            }
+
+            // Validar telÃ©fono exactamente de 10 dÃ­gitos si no estÃ¡ vacÃ­o
+            if (!telefono.isEmpty() && telefono.length() != 10) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: El telÃ©fono debe tener exactamente 10 dÃ­gitos.");
+                return;
+            }
+
+            // Validar formato de fecha si no estÃ¡ vacÃ­a (ExcepciÃ³n ParseException)
+            if (!fechaNacimiento.isEmpty()) {
+                try {
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                    sdf.setLenient(false);
+                    sdf.parse(fechaNacimiento);
+                } catch (ParseException e) {
+                    tvResultado.setTextColor(Color.RED);
+                    tvResultado.setText("Error: Formato de fecha invÃ¡lido.");
+                    return;
+                }
             }
 
             SQLiteDatabase db = null;
             try {
                 db = dbHelper.getWritableDatabase();
 
+                String genero = (spinnerGenero.getSelectedItem() != null) ? spinnerGenero.getSelectedItem().toString() : "";
+
                 ContentValues valores = new ContentValues();
                 valores.put("id_paciente", idPaciente);
                 valores.put("nombre", nombre);
                 valores.put("apellido_paterno", apellidoPaterno);
                 valores.put("apellido_materno", etApellidoMaterno.getText().toString().trim());
-                valores.put("genero", etGenero.getText().toString().trim());
-                valores.put("fecha_nacimiento", etFechaNacimiento.getText().toString().trim());
-                valores.put("telefono", etTelefono.getText().toString().trim());
+                valores.put("genero", genero);
+                valores.put("fecha_nacimiento", fechaNacimiento);
+                valores.put("telefono", telefono);
 
-                // Usa insertOrThrow para forzar la excepciÃ³n si hay duplicado
                 long resultado = db.insertOrThrow("pacientes", null, valores);
 
                 if (resultado != -1) {
                     tvResultado.setTextColor(Color.parseColor("#008800"));
                     tvResultado.setText("Paciente guardado correctamente.");
 
-                    // Limpiar formulario
+                    // Limpiar campos
+                    etIdPaciente.setText("");
                     etNombre.setText("");
                     etApellidoPaterno.setText("");
                     etApellidoMaterno.setText("");
-                    etGenero.setText("");
                     etFechaNacimiento.setText("");
                     etTelefono.setText("");
                 }
 
             } catch (SQLiteConstraintException e) {
-                // Captura especÃ­fica cuando el ID del paciente ya existe
                 tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: El expediente o ID del paciente ya estÃ¡ registrado.");
+                tvResultado.setText("Error: El expediente (ID) ya estÃ¡ registrado.");
+            } catch (NullPointerException e) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: Referencia nula al guardar campos.");
             } catch (SQLiteException e) {
                 tvResultado.setTextColor(Color.RED);
                 tvResultado.setText("Error en la Base de Datos: " + e.getMessage());
@@ -455,8 +583,8 @@ public class PacienteActivity extends AppCompatActivity {
             try {
                 dbInternar = dbHelper.getWritableDatabase();
 
-                java.text.SimpleDateFormat sdfFecha = new java.text.SimpleDateFormat("yyyy-MM-dd");
-                java.text.SimpleDateFormat sdfHora = new java.text.SimpleDateFormat("HH:mm:ss");
+                SimpleDateFormat sdfFecha = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                SimpleDateFormat sdfHora = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
                 String fechaActual = sdfFecha.format(new java.util.Date());
                 String horaActual = sdfHora.format(new java.util.Date());
 
@@ -478,10 +606,7 @@ public class PacienteActivity extends AppCompatActivity {
 
             } catch (SQLiteException e) {
                 tvResultadoInternamiento.setTextColor(Color.RED);
-                tvResultadoInternamiento.setText("Error de BD al internar: " + e.getMessage());
-            } catch (Exception e) {
-                tvResultadoInternamiento.setTextColor(Color.RED);
-                tvResultadoInternamiento.setText("Error inesperado: " + e.getMessage());
+                tvResultadoInternamiento.setText("Error de BD: " + e.getMessage());
             } finally {
                 if (dbInternar != null && dbInternar.isOpen()) {
                     dbInternar.close();
@@ -504,7 +629,6 @@ public class PacienteActivity extends AppCompatActivity {
             try {
                 dbAlta = dbHelper.getWritableDatabase();
 
-                // Busca el internamiento activo mÃ¡s reciente de ese paciente
                 cursor = dbAlta.rawQuery(
                         "SELECT id_internamiento FROM internamientos WHERE id_paciente = ? AND estado = 'internado' " +
                                 "ORDER BY id_internamiento DESC LIMIT 1",
@@ -513,8 +637,8 @@ public class PacienteActivity extends AppCompatActivity {
                 if (cursor != null && cursor.moveToFirst()) {
                     int idInternamiento = cursor.getInt(0);
 
-                    java.text.SimpleDateFormat sdfFecha = new java.text.SimpleDateFormat("yyyy-MM-dd");
-                    java.text.SimpleDateFormat sdfHora = new java.text.SimpleDateFormat("HH:mm:ss");
+                    SimpleDateFormat sdfFecha = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                    SimpleDateFormat sdfHora = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
                     String fechaActual = sdfFecha.format(new java.util.Date());
                     String horaActual = sdfHora.format(new java.util.Date());
 
@@ -531,7 +655,7 @@ public class PacienteActivity extends AppCompatActivity {
                         tvResultadoInternamiento.setText("Paciente dado de alta a las " + horaActual);
                     } else {
                         tvResultadoInternamiento.setTextColor(Color.RED);
-                        tvResultadoInternamiento.setText("Error al actualizar la alta.");
+                        tvResultadoInternamiento.setText("Error al dar de alta.");
                     }
                 } else {
                     tvResultadoInternamiento.setTextColor(Color.RED);
@@ -540,21 +664,14 @@ public class PacienteActivity extends AppCompatActivity {
 
             } catch (SQLiteException e) {
                 tvResultadoInternamiento.setTextColor(Color.RED);
-                tvResultadoInternamiento.setText("Error de BD al dar de alta: " + e.getMessage());
-            } catch (Exception e) {
-                tvResultadoInternamiento.setTextColor(Color.RED);
-                tvResultadoInternamiento.setText("Error inesperado: " + e.getMessage());
+                tvResultadoInternamiento.setText("Error de BD: " + e.getMessage());
             } finally {
-                if (cursor != null) {
-                    cursor.close();
-                }
-                if (dbAlta != null && dbAlta.isOpen()) {
-                    dbAlta.close();
-                }
+                if (cursor != null) cursor.close();
+                if (dbAlta != null && dbAlta.isOpen()) dbAlta.close();
             }
         });
 
-        // Inserta el fragment de consulta al abrir la pantalla
+        // Inserta el fragment de consulta
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.fragmentConsultaContainer, new ConsultaFragment())
                 .commit();
@@ -566,17 +683,26 @@ public class PacienteActivity extends AppCompatActivity {
 
 package com.example.hospitaltopicos;
 
+import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.ScrollView;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class TablasActivity extends AppCompatActivity {
 
@@ -585,8 +711,31 @@ public class TablasActivity extends AppCompatActivity {
     private TextView tvPacientesDoctor;
     private View layoutTablas;
     private View layoutPacientes;
+    private View layoutGestor;
 
     private final String[] tablas = {"medicos", "pacientes", "consultas", "usuarios", "internamientos"};
+
+    // Nombre de la columna llave primaria de cada tabla
+    private final Map<String, String> columnasPK = new HashMap<String, String>() {{
+        put("medicos", "id_medico");
+        put("pacientes", "id_paciente");
+        put("consultas", "id_consulta");
+        put("usuarios", "id_usuario");
+        put("internamientos", "id_internamiento");
+    }};
+
+    private LinearLayout contenedorCamposGestor;
+    private Button btnGestorActualizar;
+    private Button btnGestorEliminar;
+    private TextView tvResultadoGestor;
+    private Spinner spinnerGestorTabla;
+    private EditText etGestorId;
+
+    // Guarda los EditText dinÃ¡micos junto con su columna
+    private final List<EditText> camposGenerados = new ArrayList<>();
+    private final List<String> columnasGeneradas = new ArrayList<>();
+    private String tablaActualGestor;
+    private String valorPkActual;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -598,13 +747,25 @@ public class TablasActivity extends AppCompatActivity {
         tvPacientesDoctor = findViewById(R.id.tvPacientesDoctor);
         layoutTablas = findViewById(R.id.layoutTablas);
         layoutPacientes = findViewById(R.id.layoutPacientes);
+        layoutGestor = findViewById(R.id.layoutGestor);
+
         Spinner spinnerTablas = findViewById(R.id.spinnerTablas);
         Button btnTabTablas = findViewById(R.id.btnTabTablas);
         Button btnTabPacientes = findViewById(R.id.btnTabPacientes);
+        Button btnTabGestor = findViewById(R.id.btnTabGestor);
+
+        spinnerGestorTabla = findViewById(R.id.spinnerGestorTabla);
+        etGestorId = findViewById(R.id.etGestorId);
+        Button btnGestorBuscar = findViewById(R.id.btnGestorBuscar);
+        contenedorCamposGestor = findViewById(R.id.contenedorCamposGestor);
+        btnGestorActualizar = findViewById(R.id.btnGestorActualizar);
+        btnGestorEliminar = findViewById(R.id.btnGestorEliminar);
+        tvResultadoGestor = findViewById(R.id.tvResultadoGestor);
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, tablas);
         spinnerTablas.setAdapter(adapter);
+        spinnerGestorTabla.setAdapter(adapter);
 
         spinnerTablas.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -619,64 +780,239 @@ public class TablasActivity extends AppCompatActivity {
         btnTabTablas.setOnClickListener(v -> {
             layoutTablas.setVisibility(View.VISIBLE);
             layoutPacientes.setVisibility(View.GONE);
+            layoutGestor.setVisibility(View.GONE);
         });
 
         btnTabPacientes.setOnClickListener(v -> {
             layoutTablas.setVisibility(View.GONE);
             layoutPacientes.setVisibility(View.VISIBLE);
+            layoutGestor.setVisibility(View.GONE);
             mostrarPacientesConDoctor();
         });
+
+        btnTabGestor.setOnClickListener(v -> {
+            layoutTablas.setVisibility(View.GONE);
+            layoutPacientes.setVisibility(View.GONE);
+            layoutGestor.setVisibility(View.VISIBLE);
+        });
+
+        btnGestorBuscar.setOnClickListener(v -> buscarRegistro());
+        btnGestorActualizar.setOnClickListener(v -> actualizarRegistro());
+        btnGestorEliminar.setOnClickListener(v -> eliminarRegistro());
     }
 
     private void mostrarContenidoTabla(String nombreTabla) {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT * FROM " + nombreTabla, null);
-
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
         StringBuilder sb = new StringBuilder();
 
-        if (cursor.moveToFirst()) {
-            do {
-                for (int i = 0; i < cursor.getColumnCount(); i++) {
-                    sb.append(cursor.getColumnName(i)).append(": ")
-                            .append(cursor.getString(i)).append("\n");
-                }
-                sb.append("--------------------\n");
-            } while (cursor.moveToNext());
-        } else {
-            sb.append("(Sin registros)");
+        try {
+            db = dbHelper.getReadableDatabase();
+            cursor = db.rawQuery("SELECT * FROM " + nombreTabla, null);
+
+            if (cursor.moveToFirst()) {
+                do {
+                    for (int i = 0; i < cursor.getColumnCount(); i++) {
+                        sb.append(cursor.getColumnName(i)).append(": ")
+                                .append(cursor.getString(i)).append("\n");
+                    }
+                    sb.append("--------------------\n");
+                } while (cursor.moveToNext());
+            } else {
+                sb.append("(Sin registros)");
+            }
+        } catch (SQLiteException e) {
+            sb.append("Error al consultar la tabla: ").append(e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) db.close();
         }
 
-        cursor.close();
         tvContenidoTabla.setText(sb.toString());
     }
 
     private void mostrarPacientesConDoctor() {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-
-        String query = "SELECT p.nombre AS nombre_paciente, p.apellido_paterno, " +
-                "m.nombre AS nombre_medico, m.apellido_paterno AS apellido_medico, c.diagnostico " +
-                "FROM consultas c " +
-                "JOIN pacientes p ON c.id_paciente = p.id_paciente " +
-                "JOIN medicos m ON c.id_medico = m.id_medico";
-
-        Cursor cursor = db.rawQuery(query, null);
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
         StringBuilder sb = new StringBuilder();
 
-        if (cursor.moveToFirst()) {
-            do {
-                sb.append("Paciente: ").append(cursor.getString(0)).append(" ")
-                        .append(cursor.getString(1)).append("\n");
-                sb.append("Atendido por: Dr. ").append(cursor.getString(2)).append(" ")
-                        .append(cursor.getString(3)).append("\n");
-                sb.append("DiagnÃ³stico: ").append(cursor.getString(4)).append("\n");
-                sb.append("--------------------\n");
-            } while (cursor.moveToNext());
-        } else {
-            sb.append("(No hay consultas registradas)");
+        try {
+            db = dbHelper.getReadableDatabase();
+
+            String query = "SELECT p.nombre AS nombre_paciente, p.apellido_paterno, " +
+                    "m.nombre AS nombre_medico, m.apellido_paterno AS apellido_medico, c.diagnostico " +
+                    "FROM consultas c " +
+                    "JOIN pacientes p ON c.id_paciente = p.id_paciente " +
+                    "JOIN medicos m ON c.id_medico = m.id_medico";
+
+            cursor = db.rawQuery(query, null);
+
+            if (cursor.moveToFirst()) {
+                do {
+                    sb.append("Paciente: ").append(cursor.getString(0)).append(" ")
+                            .append(cursor.getString(1)).append("\n");
+                    sb.append("Atendido por: Dr. ").append(cursor.getString(2)).append(" ")
+                            .append(cursor.getString(3)).append("\n");
+                    sb.append("DiagnÃ³stico: ").append(cursor.getString(4)).append("\n");
+                    sb.append("--------------------\n");
+                } while (cursor.moveToNext());
+            } else {
+                sb.append("(No hay consultas registradas)");
+            }
+        } catch (SQLiteException e) {
+            sb.append("Error en la consulta JOIN: ").append(e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) db.close();
         }
 
-        cursor.close();
         tvPacientesDoctor.setText(sb.toString());
+    }
+
+    // ===================== GESTOR (buscar / actualizar / eliminar) =====================
+
+    private void buscarRegistro() {
+        if (spinnerGestorTabla.getSelectedItem() == null) return;
+        String tabla = spinnerGestorTabla.getSelectedItem().toString();
+        String idBuscado = etGestorId.getText().toString().trim();
+
+        if (idBuscado.isEmpty()) {
+            tvResultadoGestor.setTextColor(Color.RED);
+            tvResultadoGestor.setText("Escribe el ID del registro a buscar.");
+            return;
+        }
+
+        String columnaPk = columnasPK.get(tabla);
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+
+        try {
+            db = dbHelper.getReadableDatabase();
+            cursor = db.rawQuery("SELECT * FROM " + tabla + " WHERE " + columnaPk + " = ?",
+                    new String[]{idBuscado});
+
+            contenedorCamposGestor.removeAllViews();
+            camposGenerados.clear();
+            columnasGeneradas.clear();
+
+            if (cursor.moveToFirst()) {
+                for (int i = 0; i < cursor.getColumnCount(); i++) {
+                    String nombreColumna = cursor.getColumnName(i);
+                    String valor = cursor.getString(i);
+
+                    EditText campo = new EditText(this);
+                    campo.setHint(nombreColumna);
+                    campo.setText(valor);
+                    campo.setPadding(28, 28, 28, 28);
+                    campo.setBackgroundResource(R.drawable.bg_input);
+
+                    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    params.bottomMargin = 16;
+                    campo.setLayoutParams(params);
+
+                    // La llave primaria no se puede editar
+                    if (nombreColumna.equals(columnaPk)) {
+                        campo.setEnabled(false);
+                    }
+
+                    contenedorCamposGestor.addView(campo);
+                    camposGenerados.add(campo);
+                    columnasGeneradas.add(nombreColumna);
+                }
+
+                tablaActualGestor = tabla;
+                valorPkActual = idBuscado;
+                btnGestorActualizar.setVisibility(View.VISIBLE);
+                btnGestorEliminar.setVisibility(View.VISIBLE);
+                tvResultadoGestor.setTextColor(Color.parseColor("#008800"));
+                tvResultadoGestor.setText("Registro encontrado.");
+            } else {
+                btnGestorActualizar.setVisibility(View.GONE);
+                btnGestorEliminar.setVisibility(View.GONE);
+                tvResultadoGestor.setTextColor(Color.RED);
+                tvResultadoGestor.setText("No existe ningÃºn registro con ese ID.");
+            }
+
+        } catch (SQLiteException e) {
+            tvResultadoGestor.setTextColor(Color.RED);
+            tvResultadoGestor.setText("Error de base de datos: " + e.getMessage());
+        } catch (Exception e) {
+            tvResultadoGestor.setTextColor(Color.RED);
+            tvResultadoGestor.setText("Error inesperado: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) db.close();
+        }
+    }
+
+    private void actualizarRegistro() {
+        if (tablaActualGestor == null) return;
+
+        String columnaPk = columnasPK.get(tablaActualGestor);
+        SQLiteDatabase db = null;
+
+        try {
+            db = dbHelper.getWritableDatabase();
+
+            ContentValues valores = new ContentValues();
+            for (int i = 0; i < columnasGeneradas.size(); i++) {
+                String columna = columnasGeneradas.get(i);
+                if (!columna.equals(columnaPk)) {
+                    valores.put(columna, camposGenerados.get(i).getText().toString().trim());
+                }
+            }
+
+            int filas = db.update(tablaActualGestor, valores, columnaPk + " = ?", new String[]{valorPkActual});
+
+            if (filas > 0) {
+                tvResultadoGestor.setTextColor(Color.parseColor("#008800"));
+                tvResultadoGestor.setText("Registro actualizado correctamente.");
+            } else {
+                tvResultadoGestor.setTextColor(Color.RED);
+                tvResultadoGestor.setText("No se pudo actualizar el registro.");
+            }
+
+        } catch (SQLiteException e) {
+            tvResultadoGestor.setTextColor(Color.RED);
+            tvResultadoGestor.setText("Error de base de datos: " + e.getMessage());
+        } catch (NullPointerException e) {
+            tvResultadoGestor.setTextColor(Color.RED);
+            tvResultadoGestor.setText("Error: Referencia nula al leer campos del formulario.");
+        } finally {
+            if (db != null && db.isOpen()) db.close();
+        }
+    }
+
+    private void eliminarRegistro() {
+        if (tablaActualGestor == null) return;
+
+        String columnaPk = columnasPK.get(tablaActualGestor);
+        SQLiteDatabase db = null;
+
+        try {
+            db = dbHelper.getWritableDatabase();
+            int filas = db.delete(tablaActualGestor, columnaPk + " = ?", new String[]{valorPkActual});
+
+            if (filas > 0) {
+                tvResultadoGestor.setTextColor(Color.parseColor("#008800"));
+                tvResultadoGestor.setText("Registro eliminado correctamente.");
+                contenedorCamposGestor.removeAllViews();
+                btnGestorActualizar.setVisibility(View.GONE);
+                btnGestorEliminar.setVisibility(View.GONE);
+                etGestorId.setText("");
+                tablaActualGestor = null;
+            } else {
+                tvResultadoGestor.setTextColor(Color.RED);
+                tvResultadoGestor.setText("No se pudo eliminar el registro.");
+            }
+
+        } catch (SQLiteException e) {
+            tvResultadoGestor.setTextColor(Color.RED);
+            tvResultadoGestor.setText("Error de base de datos: " + e.getMessage());
+        } finally {
+            if (db != null && db.isOpen()) db.close();
+        }
     }
 }
 
@@ -1252,31 +1588,38 @@ public class WifiActivity extends AppCompatActivity {
                 style="@style/InputTexto"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Nombre"/>
+                android:hint="Nombre"
+                android:inputType="textPersonName"/>
 
             <EditText android:id="@+id/etApellidoPaterno"
                 style="@style/InputTexto"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Apellido paterno"/>
+                android:hint="Apellido paterno"
+                android:inputType="textPersonName"/>
 
             <EditText android:id="@+id/etApellidoMaterno"
                 style="@style/InputTexto"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Apellido materno"/>
+                android:hint="Apellido materno"
+                android:inputType="textPersonName"/>
 
-            <EditText android:id="@+id/etGenero"
-                style="@style/InputTexto"
+            <Spinner android:id="@+id/spinnerGenero"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="GÃ©nero"/>
+                android:background="@drawable/bg_input"
+                android:padding="14dp"
+                android:layout_marginBottom="10dp"
+                android:entries="@array/generos_array"/>
 
             <EditText android:id="@+id/etFechaNacimiento"
                 style="@style/InputTexto"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Fecha nacimiento (AAAA-MM-DD)"/>
+                android:hint="Fecha nacimiento"
+                android:focusable="false"
+                android:clickable="true"/>
 
             <EditText android:id="@+id/etTelefono"
                 style="@style/InputTexto"
@@ -1376,7 +1719,7 @@ public class WifiActivity extends AppCompatActivity {
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="4dp"
             android:text="Tablas"/>
 
         <Button
@@ -1385,9 +1728,19 @@ public class WifiActivity extends AppCompatActivity {
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="6dp"
+            android:layout_marginHorizontal="4dp"
             android:backgroundTint="@color/accent"
-            android:text="Pacientes/Doctor"/>
+            android:text="Pac/Doc"/>
+
+        <Button
+            android:id="@+id/btnTabGestor"
+            style="@style/BotonPrimario"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:backgroundTint="@color/danger"
+            android:text="Gestor"/>
 
     </LinearLayout>
 
@@ -1452,6 +1805,79 @@ public class WifiActivity extends AppCompatActivity {
                 android:textSize="13sp"
                 android:textColor="@color/text_primary"
                 android:fontFamily="monospace"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Vista 3: Gestor (actualizar / eliminar) -->
+    <ScrollView
+        android:id="@+id/layoutGestor"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card"
+            android:padding="20dp"
+            android:elevation="2dp">
+
+            <Spinner
+                android:id="@+id/spinnerGestorTabla"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_input"
+                android:padding="12dp"
+                android:layout_marginBottom="10dp"/>
+
+            <EditText
+                android:id="@+id/etGestorId"
+                style="@style/InputTexto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="ID del registro"/>
+
+            <Button
+                android:id="@+id/btnGestorBuscar"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Buscar"/>
+
+            <LinearLayout
+                android:id="@+id/contenedorCamposGestor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"/>
+
+            <Button
+                android:id="@+id/btnGestorActualizar"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Actualizar"
+                android:layout_marginTop="10dp"
+                android:visibility="gone"/>
+
+            <Button
+                android:id="@+id/btnGestorEliminar"
+                style="@style/BotonPrimario"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="@color/danger"
+                android:text="Eliminar registro"
+                android:layout_marginTop="10dp"
+                android:visibility="gone"/>
+
+            <TextView
+                android:id="@+id/tvResultadoGestor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/success"
+                android:layout_marginTop="10dp"/>
 
         </LinearLayout>
     </ScrollView>
@@ -1558,11 +1984,12 @@ public class WifiActivity extends AppCompatActivity {
         android:layout_height="wrap_content"
         android:hint="Expediente del paciente (ID)"/>
 
-    <EditText android:id="@+id/etIdMedico"
-        style="@style/InputTexto"
+    <Spinner android:id="@+id/spinnerMedico"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="ID del mÃ©dico"/>
+        android:background="@drawable/bg_input"
+        android:padding="14dp"
+        android:layout_marginBottom="10dp"/>
 
     <EditText android:id="@+id/etDiagnostico"
         style="@style/InputTexto"
@@ -1632,7 +2059,14 @@ public class WifiActivity extends AppCompatActivity {
 
 <resources>
     <string name="app_name">Hospital Topicos</string>
+    <string-array name="generos_array">
+        <item>Selecciona gÃ©nero</item>
+        <item>Masculino</item>
+        <item>Femenino</item>
+        <item>Otro</item>
+    </string-array>
 </resources>
+
 
 
 ===== C:\Users\danim\AndroidStudioProjects\HospitalTopicos\app\src\main\res\values\styles.xml =====

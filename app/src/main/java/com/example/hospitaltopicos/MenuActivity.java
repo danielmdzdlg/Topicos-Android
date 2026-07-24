@@ -16,6 +16,7 @@ public class MenuActivity extends AppCompatActivity {
         Button btnUbicacion = findViewById(R.id.btnUbicacion);
         Button btnPaciente = findViewById(R.id.btnPaciente);
         Button btnTablas = findViewById(R.id.btnTablas);
+        Button btnRegistro = findViewById(R.id.btnRegistro);
 
         btnWifi.setOnClickListener(v ->
                 startActivity(new Intent(MenuActivity.this, WifiActivity.class)));
@@ -28,5 +29,9 @@ public class MenuActivity extends AppCompatActivity {
 
         btnTablas.setOnClickListener(v ->
                 startActivity(new Intent(MenuActivity.this, TablasActivity.class)));
+
+
+        btnRegistro.setOnClickListener(v ->
+                startActivity(new Intent(MenuActivity.this, RegistroActivity.class)));
     }
 }

@@ -15,6 +15,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.HospitalTopicos">
         <activity
+            android:name=".RegistroActivity"
+            android:exported="false" />
+        <activity
             android:name=".ConsultaFragment"
             android:exported="false" />
         <activity
