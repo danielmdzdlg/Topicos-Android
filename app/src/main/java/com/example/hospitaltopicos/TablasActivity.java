@@ -119,59 +119,77 @@ public class TablasActivity extends AppCompatActivity {
     }
 
     private void mostrarContenidoTabla(String nombreTabla) {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT * FROM " + nombreTabla, null);
-
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
         StringBuilder sb = new StringBuilder();
 
-        if (cursor.moveToFirst()) {
-            do {
-                for (int i = 0; i < cursor.getColumnCount(); i++) {
-                    sb.append(cursor.getColumnName(i)).append(": ")
-                            .append(cursor.getString(i)).append("\n");
-                }
-                sb.append("--------------------\n");
-            } while (cursor.moveToNext());
-        } else {
-            sb.append("(Sin registros)");
+        try {
+            db = dbHelper.getReadableDatabase();
+            cursor = db.rawQuery("SELECT * FROM " + nombreTabla, null);
+
+            if (cursor.moveToFirst()) {
+                do {
+                    for (int i = 0; i < cursor.getColumnCount(); i++) {
+                        sb.append(cursor.getColumnName(i)).append(": ")
+                                .append(cursor.getString(i)).append("\n");
+                    }
+                    sb.append("--------------------\n");
+                } while (cursor.moveToNext());
+            } else {
+                sb.append("(Sin registros)");
+            }
+        } catch (SQLiteException e) {
+            sb.append("Error al consultar la tabla: ").append(e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) db.close();
         }
 
-        cursor.close();
         tvContenidoTabla.setText(sb.toString());
     }
 
     private void mostrarPacientesConDoctor() {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-
-        String query = "SELECT p.nombre AS nombre_paciente, p.apellido_paterno, " +
-                "m.nombre AS nombre_medico, m.apellido_paterno AS apellido_medico, c.diagnostico " +
-                "FROM consultas c " +
-                "JOIN pacientes p ON c.id_paciente = p.id_paciente " +
-                "JOIN medicos m ON c.id_medico = m.id_medico";
-
-        Cursor cursor = db.rawQuery(query, null);
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
         StringBuilder sb = new StringBuilder();
 
-        if (cursor.moveToFirst()) {
-            do {
-                sb.append("Paciente: ").append(cursor.getString(0)).append(" ")
-                        .append(cursor.getString(1)).append("\n");
-                sb.append("Atendido por: Dr. ").append(cursor.getString(2)).append(" ")
-                        .append(cursor.getString(3)).append("\n");
-                sb.append("Diagnóstico: ").append(cursor.getString(4)).append("\n");
-                sb.append("--------------------\n");
-            } while (cursor.moveToNext());
-        } else {
-            sb.append("(No hay consultas registradas)");
+        try {
+            db = dbHelper.getReadableDatabase();
+
+            String query = "SELECT p.nombre AS nombre_paciente, p.apellido_paterno, " +
+                    "m.nombre AS nombre_medico, m.apellido_paterno AS apellido_medico, c.diagnostico " +
+                    "FROM consultas c " +
+                    "JOIN pacientes p ON c.id_paciente = p.id_paciente " +
+                    "JOIN medicos m ON c.id_medico = m.id_medico";
+
+            cursor = db.rawQuery(query, null);
+
+            if (cursor.moveToFirst()) {
+                do {
+                    sb.append("Paciente: ").append(cursor.getString(0)).append(" ")
+                            .append(cursor.getString(1)).append("\n");
+                    sb.append("Atendido por: Dr. ").append(cursor.getString(2)).append(" ")
+                            .append(cursor.getString(3)).append("\n");
+                    sb.append("Diagnóstico: ").append(cursor.getString(4)).append("\n");
+                    sb.append("--------------------\n");
+                } while (cursor.moveToNext());
+            } else {
+                sb.append("(No hay consultas registradas)");
+            }
+        } catch (SQLiteException e) {
+            sb.append("Error en la consulta JOIN: ").append(e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) db.close();
         }
 
-        cursor.close();
         tvPacientesDoctor.setText(sb.toString());
     }
 
     // ===================== GESTOR (buscar / actualizar / eliminar) =====================
 
     private void buscarRegistro() {
+        if (spinnerGestorTabla.getSelectedItem() == null) return;
         String tabla = spinnerGestorTabla.getSelectedItem().toString();
         String idBuscado = etGestorId.getText().toString().trim();
 
@@ -182,10 +200,11 @@ public class TablasActivity extends AppCompatActivity {
         }
 
         String columnaPk = columnasPK.get(tabla);
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        SQLiteDatabase db = null;
         Cursor cursor = null;
 
         try {
+            db = dbHelper.getReadableDatabase();
             cursor = db.rawQuery("SELECT * FROM " + tabla + " WHERE " + columnaPk + " = ?",
                     new String[]{idBuscado});
 
@@ -235,8 +254,12 @@ public class TablasActivity extends AppCompatActivity {
         } catch (SQLiteException e) {
             tvResultadoGestor.setTextColor(Color.RED);
             tvResultadoGestor.setText("Error de base de datos: " + e.getMessage());
+        } catch (Exception e) {
+            tvResultadoGestor.setTextColor(Color.RED);
+            tvResultadoGestor.setText("Error inesperado: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) db.close();
         }
     }
 
@@ -270,6 +293,9 @@ public class TablasActivity extends AppCompatActivity {
         } catch (SQLiteException e) {
             tvResultadoGestor.setTextColor(Color.RED);
             tvResultadoGestor.setText("Error de base de datos: " + e.getMessage());
+        } catch (NullPointerException e) {
+            tvResultadoGestor.setTextColor(Color.RED);
+            tvResultadoGestor.setText("Error: Referencia nula al leer campos del formulario.");
         } finally {
             if (db != null && db.isOpen()) db.close();
         }

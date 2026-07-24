@@ -1,5 +1,6 @@
 package com.example.hospitaltopicos;
 
+import android.app.TimePickerDialog;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
@@ -18,7 +19,9 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
 
 public class ConsultaFragment extends Fragment {
 
@@ -38,24 +41,58 @@ public class ConsultaFragment extends Fragment {
 
         DatabaseHelper dbHelper = new DatabaseHelper(requireContext());
 
+        // --- RELOJ (TIMEPICKER) PARA HORA DE SALIDA ---
+        etHoraSalida.setFocusable(false);
+        etHoraSalida.setClickable(true);
+        etHoraSalida.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            int horaActual = calendar.get(Calendar.HOUR_OF_DAY);
+            int minutoActual = calendar.get(Calendar.MINUTE);
+
+            TimePickerDialog timePickerDialog = new TimePickerDialog(
+                    requireContext(),
+                    (view, hourOfDay, minute) -> {
+                        String horaFormateada = String.format(Locale.getDefault(), "%02d:%02d", hourOfDay, minute);
+                        etHoraSalida.setText(horaFormateada);
+                    },
+                    horaActual,
+                    minutoActual,
+                    true // true para formato de 24 horas (00:00 - 23:59)
+            );
+            timePickerDialog.show();
+        });
+
         // --- Cargar médicos existentes en el spinner ---
         List<Integer> idsMedicos = new ArrayList<>();
         List<String> nombresMedicos = new ArrayList<>();
 
-        SQLiteDatabase dbCarga = dbHelper.getReadableDatabase();
-        Cursor cursorMedicos = dbCarga.rawQuery(
-                "SELECT id_medico, nombre, apellido_paterno FROM medicos", null);
-
         nombresMedicos.add("Selecciona un médico");
         idsMedicos.add(-1);
 
-        if (cursorMedicos.moveToFirst()) {
-            do {
-                idsMedicos.add(cursorMedicos.getInt(0));
-                nombresMedicos.add(cursorMedicos.getInt(0) + " - " + cursorMedicos.getString(1) + " " + cursorMedicos.getString(2));
-            } while (cursorMedicos.moveToNext());
+        SQLiteDatabase dbCarga = null;
+        Cursor cursorMedicos = null;
+
+        try {
+            dbCarga = dbHelper.getReadableDatabase();
+            cursorMedicos = dbCarga.rawQuery(
+                    "SELECT id_medico, nombre, apellido_paterno FROM medicos", null);
+
+            if (cursorMedicos.moveToFirst()) {
+                do {
+                    idsMedicos.add(cursorMedicos.getInt(0));
+                    nombresMedicos.add(cursorMedicos.getInt(0) + " - " + cursorMedicos.getString(1) + " " + cursorMedicos.getString(2));
+                } while (cursorMedicos.moveToNext());
+            }
+        } catch (SQLiteException e) {
+            tvResultado.setTextColor(Color.RED);
+            tvResultado.setText("Error al cargar lista de médicos: " + e.getMessage());
+        } catch (Exception e) {
+            tvResultado.setTextColor(Color.RED);
+            tvResultado.setText("Error inesperado al leer médicos: " + e.getMessage());
+        } finally {
+            if (cursorMedicos != null) cursorMedicos.close();
+            if (dbCarga != null && dbCarga.isOpen()) dbCarga.close();
         }
-        cursorMedicos.close();
 
         ArrayAdapter<String> adapterMedicos = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item, nombresMedicos);
@@ -64,7 +101,16 @@ public class ConsultaFragment extends Fragment {
         // --- Guardar consulta ---
         btnGuardar.setOnClickListener(v -> {
             String idPaciente = etIdPaciente.getText().toString().trim();
-            int idMedico = idsMedicos.get(spinnerMedico.getSelectedItemPosition());
+
+            // Validación previa de selección en el Spinner
+            int pos = spinnerMedico.getSelectedItemPosition();
+            if (pos < 0 || pos >= idsMedicos.size()) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: Selección de médico no válida.");
+                return;
+            }
+
+            int idMedico = idsMedicos.get(pos);
             String diagnostico = etDiagnostico.getText().toString().trim();
             String horaSalida = etHoraSalida.getText().toString().trim();
 

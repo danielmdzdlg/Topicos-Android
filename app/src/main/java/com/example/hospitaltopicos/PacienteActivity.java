@@ -1,5 +1,6 @@
 package com.example.hospitaltopicos;
 
+import android.app.DatePickerDialog;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteConstraintException;
@@ -7,13 +8,18 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import android.widget.Spinner;
-import android.app.DatePickerDialog;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Locale;
 
 public class PacienteActivity extends AppCompatActivity {
 
@@ -32,24 +38,6 @@ public class PacienteActivity extends AppCompatActivity {
         EditText etApellidoMaterno = findViewById(R.id.etApellidoMaterno);
         Spinner spinnerGenero = findViewById(R.id.spinnerGenero);
         EditText etFechaNacimiento = findViewById(R.id.etFechaNacimiento);
-        etFechaNacimiento.setOnClickListener(v -> {
-            Calendar calendarioActual = Calendar.getInstance();
-
-            DatePickerDialog dialog = new DatePickerDialog(
-                    this,
-                    (view, year, month, dayOfMonth) -> {
-                        String fechaFormateada = String.format("%04d-%02d-%02d", year, month + 1, dayOfMonth);
-                        etFechaNacimiento.setText(fechaFormateada);
-                    },
-                    calendarioActual.get(Calendar.YEAR),
-                    calendarioActual.get(Calendar.MONTH),
-                    calendarioActual.get(Calendar.DAY_OF_MONTH)
-            );
-
-            // ExcepciÃ³n: no permite seleccionar fechas futuras
-            dialog.getDatePicker().setMaxDate(System.currentTimeMillis());
-            dialog.show();
-        });
         EditText etTelefono = findViewById(R.id.etTelefono);
         Button btnGuardarPaciente = findViewById(R.id.btnGuardarPaciente);
         TextView tvResultado = findViewById(R.id.tvResultado);
@@ -58,52 +46,110 @@ public class PacienteActivity extends AppCompatActivity {
         Button btnDarDeAlta = findViewById(R.id.btnDarDeAlta);
         TextView tvResultadoInternamiento = findViewById(R.id.tvResultadoInternamiento);
 
+        // --- RESTRICCIÓN DE TELÉFONO: SOLO NÚMEROS Y MÁXIMO 10 DÍGITOS ---
+        etTelefono.setInputType(InputType.TYPE_CLASS_NUMBER);
+        etTelefono.setFilters(new InputFilter[]{ new InputFilter.LengthFilter(10) });
+
+        // --- FILTRO: BLOQUEAR NÚMEROS Y SÍMBOLOS EN NOMBRES ---
+        InputFilter filtroSoloLetras = (source, start, end, dest, dstart, dend) -> {
+            for (int i = start; i < end; i++) {
+                if (!Character.isLetter(source.charAt(i)) && !Character.isWhitespace(source.charAt(i))) {
+                    return ""; // Bloquea si no es letra o espacio
+                }
+            }
+            return null;
+        };
+
+        etNombre.setFilters(new InputFilter[]{filtroSoloLetras});
+        etApellidoPaterno.setFilters(new InputFilter[]{filtroSoloLetras});
+        etApellidoMaterno.setFilters(new InputFilter[]{filtroSoloLetras});
+
+        // --- CALENDARIO (DATEPICKER) PARA FECHA DE NACIMIENTO ---
+        etFechaNacimiento.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            int anio = calendar.get(Calendar.YEAR);
+            int mes = calendar.get(Calendar.MONTH);
+            int dia = calendar.get(Calendar.DAY_OF_MONTH);
+
+            DatePickerDialog datePickerDialog = new DatePickerDialog(
+                    PacienteActivity.this,
+                    (view, year, monthOfYear, dayOfMonth) -> {
+                        String fechaSeleccionada = String.format(Locale.getDefault(), "%04d-%02d-%02d", year, monthOfYear + 1, dayOfMonth);
+                        etFechaNacimiento.setText(fechaSeleccionada);
+                    }, anio, mes, dia);
+            datePickerDialog.show();
+        });
+
         // --- BOTÓN GUARDAR PACIENTE ---
         btnGuardarPaciente.setOnClickListener(v -> {
             String idPaciente = etIdPaciente.getText().toString().trim();
             String nombre = etNombre.getText().toString().trim();
             String apellidoPaterno = etApellidoPaterno.getText().toString().trim();
+            String fechaNacimiento = etFechaNacimiento.getText().toString().trim();
+            String telefono = etTelefono.getText().toString().trim();
 
             if (idPaciente.isEmpty() || nombre.isEmpty() || apellidoPaterno.isEmpty()) {
                 tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: Faltan datos obligatorios (ID, Nombre, Apellido Paterno).");
+                tvResultado.setText("Error: Faltan datos obligatorios (ID, Nombre, Apellido).");
                 return;
+            }
+
+            // Validar teléfono exactamente de 10 dígitos si no está vacío
+            if (!telefono.isEmpty() && telefono.length() != 10) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: El teléfono debe tener exactamente 10 dígitos.");
+                return;
+            }
+
+            // Validar formato de fecha si no está vacía (Excepción ParseException)
+            if (!fechaNacimiento.isEmpty()) {
+                try {
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                    sdf.setLenient(false);
+                    sdf.parse(fechaNacimiento);
+                } catch (ParseException e) {
+                    tvResultado.setTextColor(Color.RED);
+                    tvResultado.setText("Error: Formato de fecha inválido.");
+                    return;
+                }
             }
 
             SQLiteDatabase db = null;
             try {
                 db = dbHelper.getWritableDatabase();
 
+                String genero = (spinnerGenero.getSelectedItem() != null) ? spinnerGenero.getSelectedItem().toString() : "";
+
                 ContentValues valores = new ContentValues();
                 valores.put("id_paciente", idPaciente);
                 valores.put("nombre", nombre);
                 valores.put("apellido_paterno", apellidoPaterno);
                 valores.put("apellido_materno", etApellidoMaterno.getText().toString().trim());
-                String genero = spinnerGenero.getSelectedItemPosition() == 0 ? "" : spinnerGenero.getSelectedItem().toString();
                 valores.put("genero", genero);
-                valores.put("fecha_nacimiento", etFechaNacimiento.getText().toString().trim());
-                valores.put("telefono", etTelefono.getText().toString().trim());
+                valores.put("fecha_nacimiento", fechaNacimiento);
+                valores.put("telefono", telefono);
 
-                // Usa insertOrThrow para forzar la excepción si hay duplicado
                 long resultado = db.insertOrThrow("pacientes", null, valores);
 
                 if (resultado != -1) {
                     tvResultado.setTextColor(Color.parseColor("#008800"));
                     tvResultado.setText("Paciente guardado correctamente.");
 
-                    // Limpiar formulario
+                    // Limpiar campos
+                    etIdPaciente.setText("");
                     etNombre.setText("");
                     etApellidoPaterno.setText("");
                     etApellidoMaterno.setText("");
-                    spinnerGenero.setSelection(0);
                     etFechaNacimiento.setText("");
                     etTelefono.setText("");
                 }
 
             } catch (SQLiteConstraintException e) {
-                // Captura específica cuando el ID del paciente ya existe
                 tvResultado.setTextColor(Color.RED);
-                tvResultado.setText("Error: El expediente o ID del paciente ya está registrado.");
+                tvResultado.setText("Error: El expediente (ID) ya está registrado.");
+            } catch (NullPointerException e) {
+                tvResultado.setTextColor(Color.RED);
+                tvResultado.setText("Error: Referencia nula al guardar campos.");
             } catch (SQLiteException e) {
                 tvResultado.setTextColor(Color.RED);
                 tvResultado.setText("Error en la Base de Datos: " + e.getMessage());
@@ -130,8 +176,8 @@ public class PacienteActivity extends AppCompatActivity {
             try {
                 dbInternar = dbHelper.getWritableDatabase();
 
-                java.text.SimpleDateFormat sdfFecha = new java.text.SimpleDateFormat("yyyy-MM-dd");
-                java.text.SimpleDateFormat sdfHora = new java.text.SimpleDateFormat("HH:mm:ss");
+                SimpleDateFormat sdfFecha = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                SimpleDateFormat sdfHora = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
                 String fechaActual = sdfFecha.format(new java.util.Date());
                 String horaActual = sdfHora.format(new java.util.Date());
 
@@ -153,10 +199,7 @@ public class PacienteActivity extends AppCompatActivity {
 
             } catch (SQLiteException e) {
                 tvResultadoInternamiento.setTextColor(Color.RED);
-                tvResultadoInternamiento.setText("Error de BD al internar: " + e.getMessage());
-            } catch (Exception e) {
-                tvResultadoInternamiento.setTextColor(Color.RED);
-                tvResultadoInternamiento.setText("Error inesperado: " + e.getMessage());
+                tvResultadoInternamiento.setText("Error de BD: " + e.getMessage());
             } finally {
                 if (dbInternar != null && dbInternar.isOpen()) {
                     dbInternar.close();
@@ -179,7 +222,6 @@ public class PacienteActivity extends AppCompatActivity {
             try {
                 dbAlta = dbHelper.getWritableDatabase();
 
-                // Busca el internamiento activo más reciente de ese paciente
                 cursor = dbAlta.rawQuery(
                         "SELECT id_internamiento FROM internamientos WHERE id_paciente = ? AND estado = 'internado' " +
                                 "ORDER BY id_internamiento DESC LIMIT 1",
@@ -188,8 +230,8 @@ public class PacienteActivity extends AppCompatActivity {
                 if (cursor != null && cursor.moveToFirst()) {
                     int idInternamiento = cursor.getInt(0);
 
-                    java.text.SimpleDateFormat sdfFecha = new java.text.SimpleDateFormat("yyyy-MM-dd");
-                    java.text.SimpleDateFormat sdfHora = new java.text.SimpleDateFormat("HH:mm:ss");
+                    SimpleDateFormat sdfFecha = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                    SimpleDateFormat sdfHora = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
                     String fechaActual = sdfFecha.format(new java.util.Date());
                     String horaActual = sdfHora.format(new java.util.Date());
 
@@ -206,7 +248,7 @@ public class PacienteActivity extends AppCompatActivity {
                         tvResultadoInternamiento.setText("Paciente dado de alta a las " + horaActual);
                     } else {
                         tvResultadoInternamiento.setTextColor(Color.RED);
-                        tvResultadoInternamiento.setText("Error al actualizar la alta.");
+                        tvResultadoInternamiento.setText("Error al dar de alta.");
                     }
                 } else {
                     tvResultadoInternamiento.setTextColor(Color.RED);
@@ -215,21 +257,14 @@ public class PacienteActivity extends AppCompatActivity {
 
             } catch (SQLiteException e) {
                 tvResultadoInternamiento.setTextColor(Color.RED);
-                tvResultadoInternamiento.setText("Error de BD al dar de alta: " + e.getMessage());
-            } catch (Exception e) {
-                tvResultadoInternamiento.setTextColor(Color.RED);
-                tvResultadoInternamiento.setText("Error inesperado: " + e.getMessage());
+                tvResultadoInternamiento.setText("Error de BD: " + e.getMessage());
             } finally {
-                if (cursor != null) {
-                    cursor.close();
-                }
-                if (dbAlta != null && dbAlta.isOpen()) {
-                    dbAlta.close();
-                }
+                if (cursor != null) cursor.close();
+                if (dbAlta != null && dbAlta.isOpen()) dbAlta.close();
             }
         });
 
-        // Inserta el fragment de consulta al abrir la pantalla
+        // Inserta el fragment de consulta
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.fragmentConsultaContainer, new ConsultaFragment())
                 .commit();

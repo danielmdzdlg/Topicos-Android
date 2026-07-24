@@ -35,19 +35,22 @@
                 style="@style/InputTexto"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Nombre"/>
+                android:hint="Nombre"
+                android:inputType="textPersonName"/>
 
             <EditText android:id="@+id/etApellidoPaterno"
                 style="@style/InputTexto"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Apellido paterno"/>
+                android:hint="Apellido paterno"
+                android:inputType="textPersonName"/>
 
             <EditText android:id="@+id/etApellidoMaterno"
                 style="@style/InputTexto"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Apellido materno"/>
+                android:hint="Apellido materno"
+                android:inputType="textPersonName"/>
 
             <Spinner android:id="@+id/spinnerGenero"
                 android:layout_width="match_parent"
